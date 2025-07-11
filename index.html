@@ -1,182 +1,146 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coffee Counter ☕</title>
-  <!-- TailwindCSS CDN -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coffee Counter</title>
+
+  <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Retro mono font -->
+
+  <!-- Font -->
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <!-- Supabase & Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
   <style>
-    :root {
-      /* coffee palette */
-      --coffee-dark: #4e342e;
-      --coffee-mid:  #6f4e37;
-      --coffee-light:#d7ccc8;
-      --coffee-foam: #fff5ef;
+    :root{
+      --coffee-dark:#4e342e;   /* espresso */
+      --coffee-mid:#6f4e37;    /* moka */
+      --coffee-light:#d7ccc8;  /* latte foam */
+      --danger:#b71c1c;
     }
-    body {
-      font-family: 'IBM Plex Mono', monospace;
-      background-color: var(--coffee-foam);
-      color: var(--coffee-dark);
-    }
-    .paper {
-      background-image: radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px);
-      background-size: 4px 4px;
-    }
-    .btn-type.active {
-      @apply bg-[var(--coffee-dark)] text-white;
-    }
-    /* chart container ensures no overflow */
-    .chart-card {
-      @apply bg-white p-4 rounded-2xl shadow-lg border flex flex-col;
-      height: 320px; /* fixed height for uniformity */
-    }
-    .chart-card canvas {
-      flex: 1 1 auto;
-    }
+    body{font-family:'IBM Plex Mono',monospace;background:#faf9f7;}
+    .chart-card{height:320px}
+    .btn-type{border:1px solid var(--coffee-mid);padding:.5rem 1rem;border-radius:.5rem;margin:.125rem}
+    .btn-type.active{background:var(--coffee-mid);color:#fff}
   </style>
 </head>
-<body class="paper min-h-screen p-6 flex flex-col gap-8">
-  <!-- HEADER -->
-  <header>
-    <h1 class="text-4xl md:text-5xl font-semibold tracking-tight flex items-center gap-3">
-      <span>☕</span> Coffee Counter <span class="hidden sm:inline">— Michele &amp; Martina</span>
-    </h1>
-    <p class="text-sm text-coffee-mid mt-1">Shared caffeine tracker — Supabase powered.</p>
-  </header>
 
-  <!-- NEW ENTRY FORM -->
-  <section id="add" class="flex flex-wrap items-center gap-3">
-    <label class="text-sm">Chi?</label>
-    <select id="user" class="border rounded-lg px-2 py-1 shadow-sm bg-white">
+<body class="p-4">
+<div class="max-w-3xl mx-auto space-y-6">
+
+  <!-- Controls -->
+  <div class="flex flex-wrap items-center gap-3">
+    <select id="user" class="border p-2 rounded grow">
       <option>Michele</option>
       <option>Martina</option>
     </select>
 
-    <label class="text-sm ml-4">Tipo:</label>
-    <div id="typeButtons" class="flex gap-1">
-      <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="single">Single</button>
-      <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="moka4">Moka 4</button>
-      <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="americano">Americano</button>
-      <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="decaf">Decaf</button>
+    <div id="typeButtons" class="flex flex-wrap">
+      <button class="btn-type active" data-type="single">Single</button>
+      <button class="btn-type" data-type="moka4">Moka 4</button>
+      <button class="btn-type" data-type="americano">Americano</button>
+      <button class="btn-type" data-type="decaf">Decaf</button>
     </div>
 
-    <button id="addBtn" class="bg-[var(--coffee-dark)] text-white px-4 py-1.5 rounded-lg shadow-md hover:bg-[#3b261f] transition">+ Aggiungi</button>
-  </section>
+    <button id="addBtn" class="bg-[var(--coffee-dark)] text-white px-4 py-2 rounded hover:bg-[var(--coffee-mid)] transition">
+      + Aggiungi ☕
+    </button>
+  </div>
 
-  <!-- QUICK INFO -->
-  <section id="quickInfo" class="flex flex-col sm:flex-row gap-6">
-    <div id="lastCoffeeCard" class="flex-1 p-4 rounded-2xl shadow-lg bg-white border text-center"></div>
-  </section>
+  <!-- Ultimo caffè -->
+  <div id="lastCoffeeCard" class="p-4 rounded-2xl border bg-white shadow"></div>
 
-  <!-- STAT CARDS -->
-  <section>
-    <h2 class="text-2xl mb-4">Statistiche</h2>
-    <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-6"></div>
-  </section>
+  <!-- Stats -->
+  <div id="statsGrid" class="grid md:grid-cols-3 gap-4"></div>
 
-  <!-- CHARTS -->
-  <section>
-    <h2 class="text-2xl mb-4 mt-8">Grafici</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <div class="chart-card"><canvas id="dailyChart"></canvas></div>
-      <div class="chart-card"><canvas id="typeChart"></canvas></div>
+  <!-- Charts -->
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="p-4 rounded-2xl border bg-white shadow chart-card">
+      <h3 class="uppercase tracking-wide text-[var(--coffee-mid)] mb-2">Ultimi 30 giorni</h3>
+      <canvas id="dailyChart" class="w-full h-full"></canvas>
     </div>
-  </section>
+    <div class="p-4 rounded-2xl border bg-white shadow chart-card">
+      <h3 class="uppercase tracking-wide text-[var(--coffee-mid)] mb-2">Distribuzione tipi (7 gg)</h3>
+      <canvas id="typeChart" class="w-full h-full"></canvas>
+    </div>
+  </div>
 
-  <!-- HISTORY TABLE -->
-  <section id="history" class="flex-1 overflow-x-auto mt-8">
-    <h2 class="text-2xl mb-4">Storico</h2>
+  <!-- History -->
+  <div class="overflow-x-auto">
     <table class="min-w-full text-sm">
       <thead>
-        <tr class="border-b border-gray-300">
-          <th class="p-2 text-left font-medium">Quando</th>
-          <th class="p-2 text-left font-medium">Chi</th>
-          <th class="p-2 text-left font-medium">Tipo</th>
-          <th class="p-2 text-left font-medium">Azioni</th>
+        <tr class="border-b-2 border-gray-400">
+          <th class="p-2 text-left">Data/Ora</th>
+          <th class="p-2 text-left">Utente</th>
+          <th class="p-2 text-left">Tipo</th>
+          <th class="p-2 text-left">Azioni</th>
         </tr>
       </thead>
       <tbody id="historyBody"></tbody>
     </table>
-  </section>
+  </div>
+</div>
 
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<!-- App -->
 <script type="module">
-/* ========= CONFIG ========= */
+/*──────────────────────── CONFIG ────────────────────────*/
+/* ========= CONFIG (set your own) ========= */
 const SUPABASE_URL = 'https://hcnlrldthpjzeehxilwg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmxybGR0aHBqemVlaHhpbHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMzg0MzYsImV4cCI6MjA2NzgxNDQzNn0.XaD7iXpsin7J22_HBpGJUs5IiPTpYLQupo7cYuYIN2A';
 const TABLE = 'coffee_entries';
 /*──────────────────────── INIT ──────────────────────────*/
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { realtime:{ enabled:true } });
 /*──────────────────────── STATE ─────────────────────────*/
-let entries      = [];          // dati in RAM ordinati (più recente in testa)
-let activeType   = 'single';    // default tipo selezionato
-let dailyChart, typeChart;      // istanze Chart.js
+let entries = [];              // array ordinato (più recente in testa)
+let activeType = 'single';
+let dailyChart, typeChart;
 
 const DAY = 86_400_000;
-const today      = () => new Date(new Date().setHours(0,0,0,0));
-const startOfDay = d => new Date(d.setHours(0,0,0,0));
-const startOfYear= d => new Date(d.getFullYear(), 0, 1);
-const since      = date => entries.filter(e => e.time >= date);
-
+/* helpers */
+const todayZero   = () => new Date(new Date().setHours(0,0,0,0));
+const startOfYear = d => new Date(d.getFullYear(),0,1);
 /*─────────────────── CRUD + REALTIME ───────────────────*/
-async function hydrate() {
-  const { data, error } = await supabase.from(TABLE)
-    .select('*')
-    .order('time', { ascending: false });
-  if (error) return console.error(error);
-
-  entries = data.map(e => ({ ...e, time: new Date(e.time) }));
+async function hydrate(){
+  const { data, error } = await supabase.from(TABLE).select('*').order('time',{ascending:false});
+  if(error){ console.error(error); return; }
+  entries = data.map(r=>({...r, time:new Date(r.time)}));
   renderAll();
 }
 
-/* add row */
-async function addEntry(user, type) {
-  const optimistic = { id: crypto.randomUUID(), user, type, time: new Date(), _optimistic:true };
-  entries.unshift(optimistic);
+async function addEntry(user, type){
+  const tempId = crypto.randomUUID();                           // placeholder
+  entries.unshift({ id: tempId, user, type, time: new Date(), _optimistic:true });
   renderAll();
 
-  const { data, error } = await supabase
-    .from(TABLE)
-    .insert({ user, type })
-    .select()
-    .single();
-
-  if (error) { console.error(error); hydrate(); }   // rollback
+  const { data, error } = await supabase.from(TABLE).insert({ user, type }).select().single();
+  if(error){ console.error(error); hydrate(); return; }
+  // sostituisci placeholder con riga “vera”
+  entries = entries.map(r=>r.id===tempId?({...data,time:new Date(data.time)}):r);
+  renderAll();
 }
 
-/* delete row */
-async function deleteEntry(id) {
-  // optimistic
-  entries = entries.filter(e => e.id !== id);
+async function deleteEntry(id){
+  const backup = [...entries];                  // rollback se errore
+  entries = entries.filter(r=>r.id!==id);
   renderAll();
 
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
-  if (error) { console.error(error); hydrate(); }
+  if(error){ console.error(error); entries = backup; renderAll(); }
 }
 
-/* realtime subscription */
+/* realtime broadcast */
 supabase.channel('coffee-rt')
-  .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, payload => {
-    // ricompatta sempre lo stato con i dati DB “ufficiali”
-    hydrate();
-  })
+  .on('postgres_changes', { event:'*', schema:'public', table:TABLE }, () => hydrate())
   .subscribe();
-
 /*────────────────────── RENDERERS ───────────────────────*/
-function renderLastCoffee() {
+function renderLast(){
   const card = document.getElementById('lastCoffeeCard');
-  if (!entries.length) {
-    card.innerHTML = '<span class="text-gray-500">Nessun caffè registrato.</span>';
-    return;
-  }
-  const { type, user, time } = entries[0];
+  if(!entries.length){ card.innerHTML='<span class="text-gray-500">Nessun caffè registrato.</span>'; return; }
+  const { user, type, time } = entries[0];
   card.innerHTML = `
     <h3 class="text-lg mb-1 uppercase tracking-wide text-[var(--coffee-mid)]">Ultimo caffè</h3>
     <div class="text-3xl font-bold mb-1">${type}</div>
@@ -184,138 +148,108 @@ function renderLastCoffee() {
   `;
 }
 
-function renderStats() {
-  const grid = document.getElementById('statsGrid');
-  grid.innerHTML = '';
-
+function renderStats(){
   const now = new Date();
-  const blocks = [
-    { label: 'Oggi',        from: startOfDay(new Date(now)) },
-    { label: 'Ultimi 7 gg', from: new Date(now - 7*DAY) },
-    { label: 'YTD',         from: startOfYear(new Date(now)) },
+  const ranges = [
+    { label:'Oggi',        from: todayZero() },
+    { label:'Ultimi 7 gg', from: new Date(now-DAY*7) },
+    { label:'YTD',         from: startOfYear(now) }
   ];
-
-  blocks.forEach(({ label, from }) => {
-    const subset = since(from);
-    const counts = subset.reduce((acc,{user}) => (acc[user]=(acc[user]||0)+1, acc), {});
-    const total  = subset.length;
-
-    grid.insertAdjacentHTML('beforeend', `
-      <div class="p-4 rounded-2xl shadow-lg bg-white border hover:shadow-xl transition">
+  const grid = document.getElementById('statsGrid'); grid.innerHTML='';
+  ranges.forEach(({label,from})=>{
+    const subset = entries.filter(e=>e.time>=from);
+    const perUser = subset.reduce((a,{user})=>(a[user]=(a[user]||0)+1,a),{});
+    grid.insertAdjacentHTML('beforeend',`
+      <div class="p-4 rounded-2xl shadow bg-white border hover:shadow-xl transition">
         <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">${label}</h3>
-        <div class="text-4xl font-bold mb-1">${total}</div>
+        <div class="text-4xl font-bold mb-1">${subset.length}</div>
         <div class="text-xs text-gray-500">
-            Michele: ${counts.Michele||0}<br>
-            Martina: ${counts.Martina||0}
+          Michele: ${perUser.Michele||0}<br>
+          Martina: ${perUser.Martina||0}
         </div>
       </div>
     `);
   });
 }
 
-function renderCharts() {
-  /* distruggi istanze vecchie per evitare overlay */
-  dailyChart?.destroy();  typeChart?.destroy();
+function renderCharts(){
+  dailyChart?.destroy(); typeChart?.destroy();
 
-  /* === DAILY AREA (30gg) === */
-  const ctxDaily = document.getElementById('dailyChart').getContext('2d');
-  const base = today();
-  const labels = Array.from({length:30},(_,i)=>{
-    const d = new Date(base - (29-i)*DAY);
+  /* === DAILY (per utente) === */
+  const base  = todayZero();
+  const labels= Array.from({length:30},(_,i)=>{
+    const d = new Date(base-(29-i)*DAY);
     return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'});
   });
-  const counts = labels.map((_,i)=>{
-    const s = new Date(base - (29-i)*DAY);
-    const e = new Date(s.getTime()+DAY);
-    return entries.filter(e1 => e1.time>=s && e1.time<e).length;
+  const users = ['Michele','Martina'];
+  const colors= ['#4e342e','#8d6e63'];   // espresso / cappuccino
+
+  const datasets = users.map((u,i)=>{
+    const data = labels.map((_,idx)=>{
+      const s = new Date(base-(29-idx)*DAY), e = new Date(s.getTime()+DAY);
+      return entries.filter(e1=>e1.user===u && e1.time>=s && e1.time<e).length;
+    });
+    return { label:u, data, borderColor:colors[i], pointRadius:3, tension:.35, fill:false,
+             pointBackgroundColor:colors[i] };
   });
 
-  const grad = ctxDaily.createLinearGradient(0,0,0,300);
-  grad.addColorStop(0,'rgba(111,78,55,0.45)');
-  grad.addColorStop(1,'rgba(255,245,239,0.05)');
-
-  dailyChart = new Chart(ctxDaily,{
+  new Chart(document.getElementById('dailyChart'),{
     type:'line',
-    data:{labels,
-      datasets:[{data:counts,fill:true,backgroundColor:grad,
-        borderColor:'var(--coffee-mid)',pointRadius:3,
-        pointBackgroundColor:'var(--coffee-dark)',tension:0.35}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      scales:{x:{grid:{display:false}},y:{beginAtZero:true,
-        grid:{color:'rgba(0,0,0,0.05)'}}},
-      plugins:{legend:{display:false},
-               tooltip:{backgroundColor:'var(--coffee-dark)',
-                        titleColor:'#fff',bodyColor:'#fff'}}}
+    data:{ labels, datasets },
+    options:{ responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ grid:{ display:false } }, y:{ beginAtZero:true, grid:{color:'rgba(0,0,0,0.05)'} } },
+      plugins:{ legend:{ position:'bottom' },
+        tooltip:{ backgroundColor:'var(--coffee-dark)', titleColor:'#fff', bodyColor:'#fff' } }
+    }
   });
 
-  /* === TYPE DOUGHNUT (ultimi 7gg) === */
-  const ctxType = document.getElementById('typeChart').getContext('2d');
-  const last7   = since(new Date(Date.now()-7*DAY));
-  const tCounts = last7.reduce((o,{type})=>(o[type]=(o[type]||0)+1,o),{});
-
-  typeChart = new Chart(ctxType,{
+  /* === TYPE DOUGHNUT === */
+  const last7 = entries.filter(e=>e.time>=new Date(Date.now()-DAY*7));
+  const tCount= last7.reduce((o,{type})=>(o[type]=(o[type]||0)+1,o),{});
+  new Chart(document.getElementById('typeChart'),{
     type:'doughnut',
-    data:{labels:Object.keys(tCounts),
-          datasets:[{data:Object.values(tCounts),
-                     backgroundColor:['#4e342e','#6f4e37','#8d6e63','#d7ccc8'],
-                     hoverOffset:6}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',
-                       labels:{color:'var(--coffee-dark)'}},
-               tooltip:{backgroundColor:'var(--coffee-dark)',
-                        titleColor:'#fff',bodyColor:'#fff'}}}
+    data:{ labels:Object.keys(tCount),
+           datasets:[{ data:Object.values(tCount),
+                       backgroundColor:['#4e342e','#6f4e37','#8d6e63','#d7ccc8'], hoverOffset:6 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom' },
+        tooltip:{ backgroundColor:'var(--coffee-dark)', titleColor:'#fff', bodyColor:'#fff' } }
+    }
   });
 }
 
-function renderHistory() {
-  const tbody = document.getElementById('historyBody');
-  tbody.innerHTML = '';
-
+function renderHistory(){
+  const tbody = document.getElementById('historyBody'); tbody.innerHTML='';
   entries.forEach(({id,user,type,time,_optimistic})=>{
-    const tr = document.createElement('tr');
-    tr.className = 'border-b border-gray-300';
-
-    tr.innerHTML = `
-      <td class="p-2">${time.toLocaleString('it-IT')}</td>
+    const tr=document.createElement('tr'); tr.className='border-b border-gray-300';
+    tr.innerHTML=`
+      <td class="p-2 whitespace-nowrap">${time.toLocaleString('it-IT')}</td>
       <td class="p-2">${user}</td>
       <td class="p-2 capitalize">${type}</td>
       <td class="p-2">
-        <button ${_optimistic?'disabled':''}
-          class="text-[var(--danger)] hover:underline" data-id="${id}">❌</button>
+        <button class="hover:underline text-[var(--danger)]"
+                data-id="${id}" ${_optimistic?'disabled':''}>❌</button>
       </td>`;
     tbody.appendChild(tr);
   });
-
-  /* delega per click delete */
   tbody.querySelectorAll('button[data-id]').forEach(btn=>{
     btn.onclick = () => deleteEntry(btn.dataset.id);
   });
 }
 
-function renderAll() {
-  renderLastCoffee();
-  renderStats();
-  renderCharts();
-  renderHistory();
-}
-
+function renderAll(){ renderLast(); renderStats(); renderCharts(); renderHistory(); }
 /*──────────────────────── UI HOOKS ───────────────────────*/
-document.getElementById('typeButtons').addEventListener('click', e=>{
-  const btn = e.target.closest('button[data-type]');
-  if (!btn) return;
-  activeType = btn.dataset.type;
-  /* toggle bg */
+document.getElementById('typeButtons').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-type]'); if(!btn) return;
+  activeType=btn.dataset.type;
   document.querySelectorAll('.btn-type').forEach(b=>b.classList.toggle('active',b===btn));
 });
-
-document.getElementById('addBtn').addEventListener('click',()=>{
-  const user = document.getElementById('user').value;
-  addEntry(user, activeType);
-});
-
+document.getElementById('addBtn').onclick=()=>{
+  const user=document.getElementById('user').value;
+  addEntry(user,activeType);
+};
 /*──────────────────────── BOOT ───────────────────────────*/
-hydrate();   // carica dati iniziali
+hydrate();
 </script>
 </body>
 </html>
-
