@@ -107,180 +107,189 @@
 
 <script type="module">
 /* ========= CONFIG ========= */
-/* ========= CONFIG (set your own) ========= */
 const SUPABASE_URL = 'https://hcnlrldthpjzeehxilwg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmxybGR0aHBqemVlaHhpbHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMzg0MzYsImV4cCI6MjA2NzgxNDQzNn0.XaD7iXpsin7J22_HBpGJUs5IiPTpYLQupo7cYuYIN2A';
 const TABLE = 'coffee_entries';
-
-/* ========= INIT SUPABASE ========= */
+/*──────────────────────── INIT ──────────────────────────*/
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ========= STATE ========= */
-let entries = [];
-let activeType = 'single';
-let dailyChart, typeChart;
+/*──────────────────────── STATE ─────────────────────────*/
+let entries      = [];          // dati in RAM ordinati (più recente in testa)
+let activeType   = 'single';    // default tipo selezionato
+let dailyChart, typeChart;      // istanze Chart.js
 
-/* ========= DATA OPS ========= */
-async function fetchEntries() {
-  const { data, error } = await supabase.from(TABLE).select('*').order('time', { ascending: false });
+const DAY = 86_400_000;
+const today      = () => new Date(new Date().setHours(0,0,0,0));
+const startOfDay = d => new Date(d.setHours(0,0,0,0));
+const startOfYear= d => new Date(d.getFullYear(), 0, 1);
+const since      = date => entries.filter(e => e.time >= date);
+
+/*─────────────────── CRUD + REALTIME ───────────────────*/
+async function hydrate() {
+  const { data, error } = await supabase.from(TABLE)
+    .select('*')
+    .order('time', { ascending: false });
   if (error) return console.error(error);
+
   entries = data.map(e => ({ ...e, time: new Date(e.time) }));
   renderAll();
 }
 
+/* add row */
 async function addEntry(user, type) {
-  const { error } = await supabase.from(TABLE).insert({ user, type });
-  if (error) console.error(error);
+  const optimistic = { id: crypto.randomUUID(), user, type, time: new Date(), _optimistic:true };
+  entries.unshift(optimistic);
+  renderAll();
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .insert({ user, type })
+    .select()
+    .single();
+
+  if (error) { console.error(error); hydrate(); }   // rollback
 }
 
-async function removeEntry(id) {
+/* delete row */
+async function deleteEntry(id) {
+  // optimistic
+  entries = entries.filter(e => e.id !== id);
+  renderAll();
+
   const { error } = await supabase.from(TABLE).delete().eq('id', id);
-  if (error) console.error(error);
+  if (error) { console.error(error); hydrate(); }
 }
 
-/* ========= REAL‑TIME ========= */
+/* realtime subscription */
 supabase.channel('coffee-rt')
-  .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, fetchEntries)
+  .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, payload => {
+    // ricompatta sempre lo stato con i dati DB “ufficiali”
+    hydrate();
+  })
   .subscribe();
 
-/* ========= HELPERS ========= */
-const DAY_MS = 86_400_000;
-const startOfDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const startOfYear = (d = new Date()) => new Date(d.getFullYear(), 0, 1);
-const since = date => entries.filter(e => e.time >= date);
-
-/* ========= RENDERERS ========= */
+/*────────────────────── RENDERERS ───────────────────────*/
 function renderLastCoffee() {
   const card = document.getElementById('lastCoffeeCard');
   if (!entries.length) {
     card.innerHTML = '<span class="text-gray-500">Nessun caffè registrato.</span>';
     return;
   }
-  const last = entries[0];
+  const { type, user, time } = entries[0];
   card.innerHTML = `
     <h3 class="text-lg mb-1 uppercase tracking-wide text-[var(--coffee-mid)]">Ultimo caffè</h3>
-    <div class="text-3xl font-bold mb-1">${last.type}</div>
-    <div class="text-sm text-gray-600">${last.user} — ${last.time.toLocaleString('it-IT')}</div>
+    <div class="text-3xl font-bold mb-1">${type}</div>
+    <div class="text-sm text-gray-600">${user} — ${time.toLocaleString('it-IT')}</div>
   `;
 }
 
 function renderStats() {
-  const now = new Date();
-  const periods = [
-    { label: 'Oggi', since: startOfDay(now) },
-    { label: 'Ultimi 7 giorni', since: new Date(now - 7 * DAY_MS) },
-    { label: 'YTD', since: startOfYear(now) },
-  ];
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = '';
-  periods.forEach(p => {
-    const counts = since(p.since).reduce((obj, e) => (obj[e.user] = (obj[e.user] || 0) + 1, obj), {});
-    const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    const usersHTML = ['Michele', 'Martina'].map(u => `<span class="block">${u}: ${counts[u] || 0}</span>`).join('');
-    const card = document.createElement('div');
-    card.className = 'p-4 rounded-2xl shadow-lg bg-white border hover:shadow-xl transition';
-    card.innerHTML = `
-      <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">${p.label}</h3>
-      <div class="text-4xl font-bold mb-1">${total}</div>
-      <div class="text-xs text-gray-500 leading-tight">${usersHTML}</div>
-    `;
-    grid.appendChild(card);
+
+  const now = new Date();
+  const blocks = [
+    { label: 'Oggi',        from: startOfDay(new Date(now)) },
+    { label: 'Ultimi 7 gg', from: new Date(now - 7*DAY) },
+    { label: 'YTD',         from: startOfYear(new Date(now)) },
+  ];
+
+  blocks.forEach(({ label, from }) => {
+    const subset = since(from);
+    const counts = subset.reduce((acc,{user}) => (acc[user]=(acc[user]||0)+1, acc), {});
+    const total  = subset.length;
+
+    grid.insertAdjacentHTML('beforeend', `
+      <div class="p-4 rounded-2xl shadow-lg bg-white border hover:shadow-xl transition">
+        <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">${label}</h3>
+        <div class="text-4xl font-bold mb-1">${total}</div>
+        <div class="text-xs text-gray-500">
+            Michele: ${counts.Michele||0}<br>
+            Martina: ${counts.Martina||0}
+        </div>
+      </div>
+    `);
   });
 }
 
 function renderCharts() {
-  // destroy previous
-  dailyChart?.destroy();
-  typeChart?.destroy();
+  /* distruggi istanze vecchie per evitare overlay */
+  dailyChart?.destroy();  typeChart?.destroy();
 
-  // --- DAILY AREA CHART (30 days) ---
-  const canvasDaily = document.getElementById('dailyChart');
-  const ctxDaily = canvasDaily.getContext('2d');
-  const today = startOfDay();
-  const labels = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(today - (29 - i) * DAY_MS);
-    return d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+  /* === DAILY AREA (30gg) === */
+  const ctxDaily = document.getElementById('dailyChart').getContext('2d');
+  const base = today();
+  const labels = Array.from({length:30},(_,i)=>{
+    const d = new Date(base - (29-i)*DAY);
+    return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'});
   });
-  const counts = labels.map((_, i) => {
-    const dayStart = new Date(today - (29 - i) * DAY_MS);
-    const dayEnd   = new Date(dayStart.getTime() + DAY_MS);
-    return entries.filter(e => e.time >= dayStart && e.time < dayEnd).length;
-  });
-  const gradient = ctxDaily.createLinearGradient(0, 0, 0, 300);
-  gradient.addColorStop(0, 'rgba(111, 78, 55, 0.4)'); // coffee mid
-  gradient.addColorStop(1, 'rgba(255, 245, 239, 0.05)'); // foam
-  dailyChart = new Chart(ctxDaily, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Caffè/giorno',
-        data: counts,
-        fill: true,
-        backgroundColor: gradient,
-        borderColor: 'var(--coffee-mid)',
-        tension: 0.35,
-        pointRadius: 3,
-        pointBackgroundColor: 'var(--coffee-dark)'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        x: { grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: { backgroundColor: 'var(--coffee-dark)', titleColor: '#fff', bodyColor: '#fff' }
-      }
-    }
+  const counts = labels.map((_,i)=>{
+    const s = new Date(base - (29-i)*DAY);
+    const e = new Date(s.getTime()+DAY);
+    return entries.filter(e1 => e1.time>=s && e1.time<e).length;
   });
 
-  // --- TYPE DOUGHNUT (last 7 days) ---
-  const canvasType = document.getElementById('typeChart');
-  const ctxType = canvasType.getContext('2d');
-  const last7 = since(new Date(Date.now() - 7 * DAY_MS));
-  const typeCounts = last7.reduce((o, e) => (o[e.type] = (o[e.type] || 0) + 1, o), {});
-  const COLORS = ['#4e342e', '#6f4e37', '#8d6e63', '#d7ccc8'];
-  typeChart = new Chart(ctxType, {
-    type: 'doughnut',
-    data: {
-      labels: Object.keys(typeCounts),
-      datasets: [{
-        data: Object.values(typeCounts),
-        backgroundColor: COLORS.slice(0, Object.keys(typeCounts).length),
-        hoverOffset: 6
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { color: 'var(--coffee-dark)' } },
-        tooltip: { backgroundColor: 'var(--coffee-dark)', titleColor: '#fff', bodyColor: '#fff' }
-      }
-    }
+  const grad = ctxDaily.createLinearGradient(0,0,0,300);
+  grad.addColorStop(0,'rgba(111,78,55,0.45)');
+  grad.addColorStop(1,'rgba(255,245,239,0.05)');
+
+  dailyChart = new Chart(ctxDaily,{
+    type:'line',
+    data:{labels,
+      datasets:[{data:counts,fill:true,backgroundColor:grad,
+        borderColor:'var(--coffee-mid)',pointRadius:3,
+        pointBackgroundColor:'var(--coffee-dark)',tension:0.35}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      scales:{x:{grid:{display:false}},y:{beginAtZero:true,
+        grid:{color:'rgba(0,0,0,0.05)'}}},
+      plugins:{legend:{display:false},
+               tooltip:{backgroundColor:'var(--coffee-dark)',
+                        titleColor:'#fff',bodyColor:'#fff'}}}
+  });
+
+  /* === TYPE DOUGHNUT (ultimi 7gg) === */
+  const ctxType = document.getElementById('typeChart').getContext('2d');
+  const last7   = since(new Date(Date.now()-7*DAY));
+  const tCounts = last7.reduce((o,{type})=>(o[type]=(o[type]||0)+1,o),{});
+
+  typeChart = new Chart(ctxType,{
+    type:'doughnut',
+    data:{labels:Object.keys(tCounts),
+          datasets:[{data:Object.values(tCounts),
+                     backgroundColor:['#4e342e','#6f4e37','#8d6e63','#d7ccc8'],
+                     hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',
+                       labels:{color:'var(--coffee-dark)'}},
+               tooltip:{backgroundColor:'var(--coffee-dark)',
+                        titleColor:'#fff',bodyColor:'#fff'}}}
   });
 }
 
 function renderHistory() {
   const tbody = document.getElementById('historyBody');
   tbody.innerHTML = '';
-  entries.forEach(e => {
+
+  entries.forEach(({id,user,type,time,_optimistic})=>{
     const tr = document.createElement('tr');
-    tr.className = 'border-b border-gray-200 hover:bg-gray-100';
+    tr.className = 'border-b border-gray-300';
+
     tr.innerHTML = `
-      <td class="p-2 whitespace-nowrap">${e.time.toLocaleString('it-IT')}</td>
-      <td class="p-2">${e.user}</td>
-      <td class="p-2 capitalize">${e.type}</td>
-      <td class="p-2"><button class="text-red-600 hover:underline" data-id="${e.id}">✕</button></td>
-    `;
+      <td class="p-2">${time.toLocaleString('it-IT')}</td>
+      <td class="p-2">${user}</td>
+      <td class="p-2 capitalize">${type}</td>
+      <td class="p-2">
+        <button ${_optimistic?'disabled':''}
+          class="text-[var(--danger)] hover:underline" data-id="${id}">❌</button>
+      </td>`;
     tbody.appendChild(tr);
   });
-  tbody.querySelectorAll('button[data-id]').forEach(btn => btn.addEventListener('click', () => removeEntry(btn.dataset.id)));
+
+  /* delega per click delete */
+  tbody.querySelectorAll('button[data-id]').forEach(btn=>{
+    btn.onclick = () => deleteEntry(btn.dataset.id);
+  });
 }
 
 function renderAll() {
@@ -290,21 +299,22 @@ function renderAll() {
   renderHistory();
 }
 
-/* ========= UI EVENTS ========= */
-const typeButtons = document.querySelectorAll('.btn-type');
-typeButtons.forEach(btn => btn.addEventListener('click', () => {
-  typeButtons.forEach(b => b.classList.remove('bg-[var(--coffee-dark)]', 'text-white'));
-  btn.classList.add('bg-[var(--coffee-dark)]', 'text-white');
+/*──────────────────────── UI HOOKS ───────────────────────*/
+document.getElementById('typeButtons').addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-type]');
+  if (!btn) return;
   activeType = btn.dataset.type;
-}));
+  /* toggle bg */
+  document.querySelectorAll('.btn-type').forEach(b=>b.classList.toggle('active',b===btn));
+});
 
-document.getElementById('addBtn').addEventListener('click', () => {
+document.getElementById('addBtn').addEventListener('click',()=>{
   const user = document.getElementById('user').value;
   addEntry(user, activeType);
 });
 
-/* ========= INITIAL LOAD ========= */
-fetchEntries();
+/*──────────────────────── BOOT ───────────────────────────*/
+hydrate();   // carica dati iniziali
 </script>
 </body>
 </html>
