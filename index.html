@@ -4,27 +4,40 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Coffee Counter ☕</title>
-  <!-- TailwindCSS → quick CDN load -->
+  <!-- TailwindCSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Fonts → retro-mono -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Retro mono font -->
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <!-- Supabase JS & Chart.js -->
+  <!-- Supabase & Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
   <style>
+    :root {
+      /* coffee palette */
+      --coffee-dark: #4e342e;
+      --coffee-mid:  #6f4e37;
+      --coffee-light:#d7ccc8;
+      --coffee-foam: #fff5ef;
+    }
     body {
       font-family: 'IBM Plex Mono', monospace;
-      background-color: #fdfcf8;
-      color: #1e1e1e;
+      background-color: var(--coffee-foam);
+      color: var(--coffee-dark);
     }
     .paper {
       background-image: radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px);
       background-size: 4px 4px;
     }
     .btn-type.active {
-      @apply bg-black text-white;
+      @apply bg-[var(--coffee-dark)] text-white;
+    }
+    /* chart container ensures no overflow */
+    .chart-card {
+      @apply bg-white p-4 rounded-2xl shadow-lg border flex flex-col;
+      height: 320px; /* fixed height for uniformity */
+    }
+    .chart-card canvas {
+      flex: 1 1 auto;
     }
   </style>
 </head>
@@ -34,7 +47,7 @@
     <h1 class="text-4xl md:text-5xl font-semibold tracking-tight flex items-center gap-3">
       <span>☕</span> Coffee Counter <span class="hidden sm:inline">— Michele &amp; Martina</span>
     </h1>
-    <p class="text-sm text-gray-600 mt-1">Shared caffeine tracker — Supabase powered.</p>
+    <p class="text-sm text-coffee-mid mt-1">Shared caffeine tracker — Supabase powered.</p>
   </header>
 
   <!-- NEW ENTRY FORM -->
@@ -48,17 +61,17 @@
     <label class="text-sm ml-4">Tipo:</label>
     <div id="typeButtons" class="flex gap-1">
       <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="single">Single</button>
-      <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="moka4">Moka 4</button>
+      <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="moka4">Moka 4</button>
       <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="americano">Americano</button>
       <button class="btn-type border px-2 py-1 rounded-lg shadow-sm" data-type="decaf">Decaf</button>
     </div>
 
-    <button id="addBtn" class="bg-black text-white px-4 py-1.5 rounded-lg shadow-md hover:bg-gray-800 transition">+ Aggiungi</button>
+    <button id="addBtn" class="bg-[var(--coffee-dark)] text-white px-4 py-1.5 rounded-lg shadow-md hover:bg-[#3b261f] transition">+ Aggiungi</button>
   </section>
 
   <!-- QUICK INFO -->
   <section id="quickInfo" class="flex flex-col sm:flex-row gap-6">
-    <div id="lastCoffeeCard" class="flex-1 p-4 rounded-2xl shadow-lg bg-white border border-gray-200 text-center"></div>
+    <div id="lastCoffeeCard" class="flex-1 p-4 rounded-2xl shadow-lg bg-white border text-center"></div>
   </section>
 
   <!-- STAT CARDS -->
@@ -71,8 +84,8 @@
   <section>
     <h2 class="text-2xl mb-4 mt-8">Grafici</h2>
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      <canvas id="dailyChart" class="bg-white rounded-2xl p-4 shadow-lg border"></canvas>
-      <canvas id="typeChart" class="bg-white rounded-2xl p-4 shadow-lg border"></canvas>
+      <div class="chart-card"><canvas id="dailyChart"></canvas></div>
+      <div class="chart-card"><canvas id="typeChart"></canvas></div>
     </div>
   </section>
 
@@ -93,6 +106,7 @@
   </section>
 
 <script type="module">
+/* ========= CONFIG ========= */
 /* ========= CONFIG (set your own) ========= */
 const SUPABASE_URL = 'https://hcnlrldthpjzeehxilwg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjbmxybGR0aHBqemVlaHhpbHdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyMzg0MzYsImV4cCI6MjA2NzgxNDQzNn0.XaD7iXpsin7J22_HBpGJUs5IiPTpYLQupo7cYuYIN2A';
@@ -117,8 +131,7 @@ async function fetchEntries() {
 
 async function addEntry(user, type) {
   const { error } = await supabase.from(TABLE).insert({ user, type });
-  if (error) return console.error(error);
-  // Supabase real-time will update
+  if (error) console.error(error);
 }
 
 async function removeEntry(id) {
@@ -126,33 +139,32 @@ async function removeEntry(id) {
   if (error) console.error(error);
 }
 
-/* ========= REAL-TIME SUB ========= */
-supabase
-  .channel('coffee-rt')
-  .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, payload => {
-    fetchEntries();
-  })
+/* ========= REAL‑TIME ========= */
+supabase.channel('coffee-rt')
+  .on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, fetchEntries)
   .subscribe();
 
-/* ========= RENDER HELPERS ========= */
-const DAY_MS = 24 * 60 * 60 * 1000;
-function startOfDay(d = new Date()) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-function startOfYear(d = new Date()) { return new Date(d.getFullYear(), 0, 1); }
-function since(date) { return entries.filter(e => e.time >= date); }
+/* ========= HELPERS ========= */
+const DAY_MS = 86_400_000;
+const startOfDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const startOfYear = (d = new Date()) => new Date(d.getFullYear(), 0, 1);
+const since = date => entries.filter(e => e.time >= date);
 
-/* ========= RENDER QUICK INFO ========= */
+/* ========= RENDERERS ========= */
 function renderLastCoffee() {
   const card = document.getElementById('lastCoffeeCard');
-  if (!entries.length) { card.innerHTML = '<span class="text-gray-500">Nessun caffè registrato.</span>'; return; }
+  if (!entries.length) {
+    card.innerHTML = '<span class="text-gray-500">Nessun caffè registrato.</span>';
+    return;
+  }
   const last = entries[0];
   card.innerHTML = `
-    <h3 class="text-lg mb-1 uppercase tracking-wide">Ultimo caffè</h3>
+    <h3 class="text-lg mb-1 uppercase tracking-wide text-[var(--coffee-mid)]">Ultimo caffè</h3>
     <div class="text-3xl font-bold mb-1">${last.type}</div>
     <div class="text-sm text-gray-600">${last.user} — ${last.time.toLocaleString('it-IT')}</div>
   `;
 }
 
-/* ========= RENDER STATS ========= */
 function renderStats() {
   const now = new Date();
   const periods = [
@@ -163,18 +175,13 @@ function renderStats() {
   const grid = document.getElementById('statsGrid');
   grid.innerHTML = '';
   periods.forEach(p => {
-    const counts = since(p.since).reduce((obj, e) => {
-      obj[e.user] = (obj[e.user] || 0) + 1;
-      return obj;
-    }, {});
+    const counts = since(p.since).reduce((obj, e) => (obj[e.user] = (obj[e.user] || 0) + 1, obj), {});
     const total = Object.values(counts).reduce((a, b) => a + b, 0);
-    const usersHTML = ['Michele', 'Martina']
-      .map(u => `<span class="block">${u}: ${counts[u] || 0}</span>`)
-      .join('');
+    const usersHTML = ['Michele', 'Martina'].map(u => `<span class="block">${u}: ${counts[u] || 0}</span>`).join('');
     const card = document.createElement('div');
-    card.className = 'p-4 rounded-2xl shadow-lg bg-white border border-gray-200 hover:shadow-xl transition';
+    card.className = 'p-4 rounded-2xl shadow-lg bg-white border hover:shadow-xl transition';
     card.innerHTML = `
-      <h3 class="text-lg mb-2 uppercase tracking-wide">${p.label}</h3>
+      <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">${p.label}</h3>
       <div class="text-4xl font-bold mb-1">${total}</div>
       <div class="text-xs text-gray-500 leading-tight">${usersHTML}</div>
     `;
@@ -182,13 +189,14 @@ function renderStats() {
   });
 }
 
-/* ========= RENDER CHARTS ========= */
 function renderCharts() {
-  // Destroy existing charts to avoid duplicate canvas context
+  // destroy previous
   dailyChart?.destroy();
   typeChart?.destroy();
 
-  // ----- Daily line chart (last 30d) -----
+  // --- DAILY AREA CHART (30 days) ---
+  const canvasDaily = document.getElementById('dailyChart');
+  const ctxDaily = canvasDaily.getContext('2d');
   const today = startOfDay();
   const labels = Array.from({ length: 30 }, (_, i) => {
     const d = new Date(today - (29 - i) * DAY_MS);
@@ -196,32 +204,68 @@ function renderCharts() {
   });
   const counts = labels.map((_, i) => {
     const dayStart = new Date(today - (29 - i) * DAY_MS);
-    const dayEnd = new Date(dayStart.getTime() + DAY_MS);
+    const dayEnd   = new Date(dayStart.getTime() + DAY_MS);
     return entries.filter(e => e.time >= dayStart && e.time < dayEnd).length;
   });
-  dailyChart = new Chart(document.getElementById('dailyChart'), {
+  const gradient = ctxDaily.createLinearGradient(0, 0, 0, 300);
+  gradient.addColorStop(0, 'rgba(111, 78, 55, 0.4)'); // coffee mid
+  gradient.addColorStop(1, 'rgba(255, 245, 239, 0.05)'); // foam
+  dailyChart = new Chart(ctxDaily, {
     type: 'line',
-    data: { labels, datasets: [{ data: counts, fill: false, tension: 0.3 }] },
-    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    data: {
+      labels,
+      datasets: [{
+        label: 'Caffè/giorno',
+        data: counts,
+        fill: true,
+        backgroundColor: gradient,
+        borderColor: 'var(--coffee-mid)',
+        tension: 0.35,
+        pointRadius: 3,
+        pointBackgroundColor: 'var(--coffee-dark)'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: { backgroundColor: 'var(--coffee-dark)', titleColor: '#fff', bodyColor: '#fff' }
+      }
+    }
   });
 
-  // ----- Type distribution pie (last 7d) -----
+  // --- TYPE DOUGHNUT (last 7 days) ---
+  const canvasType = document.getElementById('typeChart');
+  const ctxType = canvasType.getContext('2d');
   const last7 = since(new Date(Date.now() - 7 * DAY_MS));
-  const typeCounts = last7.reduce((obj, e) => {
-    obj[e.type] = (obj[e.type] || 0) + 1;
-    return obj;
-  }, {});
-  typeChart = new Chart(document.getElementById('typeChart'), {
-    type: 'pie',
+  const typeCounts = last7.reduce((o, e) => (o[e.type] = (o[e.type] || 0) + 1, o), {});
+  const COLORS = ['#4e342e', '#6f4e37', '#8d6e63', '#d7ccc8'];
+  typeChart = new Chart(ctxType, {
+    type: 'doughnut',
     data: {
       labels: Object.keys(typeCounts),
-      datasets: [{ data: Object.values(typeCounts) }]
+      datasets: [{
+        data: Object.values(typeCounts),
+        backgroundColor: COLORS.slice(0, Object.keys(typeCounts).length),
+        hoverOffset: 6
+      }]
     },
-    options: { plugins: { legend: { position: 'bottom' } } }
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: 'var(--coffee-dark)' } },
+        tooltip: { backgroundColor: 'var(--coffee-dark)', titleColor: '#fff', bodyColor: '#fff' }
+      }
+    }
   });
 }
 
-/* ========= RENDER HISTORY ========= */
 function renderHistory() {
   const tbody = document.getElementById('historyBody');
   tbody.innerHTML = '';
@@ -229,19 +273,16 @@ function renderHistory() {
     const tr = document.createElement('tr');
     tr.className = 'border-b border-gray-200 hover:bg-gray-100';
     tr.innerHTML = `
-      <td class="p-2">${e.time.toLocaleString('it-IT')}</td>
+      <td class="p-2 whitespace-nowrap">${e.time.toLocaleString('it-IT')}</td>
       <td class="p-2">${e.user}</td>
       <td class="p-2 capitalize">${e.type}</td>
       <td class="p-2"><button class="text-red-600 hover:underline" data-id="${e.id}">✕</button></td>
     `;
     tbody.appendChild(tr);
   });
-  tbody.querySelectorAll('button[data-id]').forEach(btn => {
-    btn.addEventListener('click', () => removeEntry(btn.dataset.id));
-  });
+  tbody.querySelectorAll('button[data-id]').forEach(btn => btn.addEventListener('click', () => removeEntry(btn.dataset.id)));
 }
 
-/* ========= RENDER ALL ========= */
 function renderAll() {
   renderLastCoffee();
   renderStats();
@@ -249,24 +290,22 @@ function renderAll() {
   renderHistory();
 }
 
-/* ========= EVENTS ========= */
-// Type selector buttons
+/* ========= UI EVENTS ========= */
 const typeButtons = document.querySelectorAll('.btn-type');
-typeButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    typeButtons.forEach(b => b.classList.remove('bg-black', 'text-white'));
-    btn.classList.add('bg-black', 'text-white');
-    activeType = btn.dataset.type;
-  });
-});
+typeButtons.forEach(btn => btn.addEventListener('click', () => {
+  typeButtons.forEach(b => b.classList.remove('bg-[var(--coffee-dark)]', 'text-white'));
+  btn.classList.add('bg-[var(--coffee-dark)]', 'text-white');
+  activeType = btn.dataset.type;
+}));
 
 document.getElementById('addBtn').addEventListener('click', () => {
   const user = document.getElementById('user').value;
   addEntry(user, activeType);
 });
 
-/* ========= FIRST LOAD ========= */
+/* ========= INITIAL LOAD ========= */
 fetchEntries();
 </script>
 </body>
 </html>
+
