@@ -42,6 +42,38 @@
     .info-card {
       @apply flex-1 p-4 rounded-2xl shadow-lg bg-white border border-[var(--coffee-light)] flex flex-col justify-center items-center text-center;
     }
+
+    /* Coffee emoji animation */
+    .coffee-rain-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 1000;
+    }
+
+    .coffee-emoji {
+      position: absolute;
+      font-size: 2rem;
+      opacity: 0;
+      animation: fallFade 1.5s forwards ease-out;
+      transform: translateY(0) rotate(0);
+      will-change: transform, opacity;
+    }
+
+    @keyframes fallFade {
+      0% {
+        opacity: 0.8;
+        transform: translateY(-50px) rotate(0deg);
+      }
+      100% {
+        opacity: 0;
+        transform: translateY(200px) rotate(720deg);
+      }
+    }
   </style>
 </head>
 <body class="paper min-h-screen p-6 flex flex-col gap-8">
@@ -67,10 +99,7 @@
       <button class="btn-type px-3 py-1 rounded-lg" data-type="decaf">Decaf</button>
     </div>
 
-    <button id="addBtn" class="bg-[var(--coffee-dark)] text-white px-5 py-2 rounded-lg shadow-md hover:bg-[#3b261f] transition transform hover:scale-105">
-      + Aggiungi
-    </button>
-  </section>
+    </section>
 
   <section id="quickInfo" class="grid grid-cols-1 md:grid-cols-3 gap-6">
     <div id="lastCoffeeCard" class="info-card"></div>
@@ -104,6 +133,8 @@
       <tbody id="historyBody"></tbody>
     </table>
   </section>
+
+  <div class="coffee-rain-container" id="coffeeRainContainer"></div>
 
 <script type="module">
 /* ========= CONFIG ========= */
@@ -152,6 +183,7 @@ async function addEntry(user, type) {
   const optimistic = { id: crypto.randomUUID(), user, type, time: new Date(), _optimistic:true };
   entries.unshift(optimistic);
   renderAll(); // Re-render immediately for optimistic UI
+  showCoffeeConfirmation(); // Show coffee emojis
 
   const { data, error } = await supabase
     .from(TABLE)
@@ -189,6 +221,29 @@ function calculateCurrentCaffeine(userName) {
       totalCaffeine += remainingCaffeine;
     });
   return totalCaffeine.toFixed(1); // Return with one decimal place
+}
+
+/*────────────────────── UI CONFIRMATION ───────────────────────*/
+function showCoffeeConfirmation() {
+  const container = document.getElementById('coffeeRainContainer');
+  const numberOfEmojis = 10; // Number of emojis to display
+
+  for (let i = 0; i < numberOfEmojis; i++) {
+    const emoji = document.createElement('div');
+    emoji.className = 'coffee-emoji';
+    emoji.textContent = '☕'; // The coffee emoji
+
+    // Random position within the top part of the screen
+    emoji.style.left = `${Math.random() * 100}vw`;
+    emoji.style.top = `${Math.random() * -100}px`; // Start above the viewport
+
+    container.appendChild(emoji);
+
+    // Remove emoji after its animation finishes
+    emoji.addEventListener('animationend', () => {
+      emoji.remove();
+    });
+  }
 }
 
 /*────────────────────── RENDERERS ───────────────────────*/
@@ -379,18 +434,20 @@ function renderAll() {
 }
 
 /*──────────────────────── UI HOOKS ───────────────────────*/
+// Handle click on coffee type buttons
 document.getElementById('typeButtons').addEventListener('click', e=>{
   const btn = e.target.closest('button[data-type]');
   if (!btn) return;
-  activeType = btn.dataset.type;
-  /* toggle bg */
-  document.querySelectorAll('.btn-type').forEach(b=>b.classList.toggle('active',b===btn));
+
+  activeType = btn.dataset.type; // Update active type
+  // Update active style immediately
+  document.querySelectorAll('.btn-type').forEach(b => b.classList.toggle('active', b === btn));
+
+  const user = document.getElementById('user').value;
+  addEntry(user, activeType); // Directly add entry on button click
 });
 
-document.getElementById('addBtn').addEventListener('click',()=>{
-  const user = document.getElementById('user').value;
-  addEntry(user, activeType);
-});
+// Removed the 'addBtn' event listener as it's no longer needed
 
 /*──────────────────────── BOOT ───────────────────────────*/
 hydrate();    // carica dati iniziali
