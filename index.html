@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Coffee Counter ☕</title>
+  <!-- TailwindCSS via CDN for quick start -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Vintage‑ish mono font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'IBM Plex Mono', monospace;
+      background-color: #fdfcf8; /* off‑white, a bit retro */
+      color: #1e1e1e;
+    }
+    .paper {
+      background-image: radial-gradient(circle, rgba(0,0,0,0.04) 1px, transparent 1px);
+      background-size: 4px 4px; /* subtle dot paper texture */
+    }
+  </style>
+</head>
+<body class="paper min-h-screen p-6 flex flex-col gap-8">
+  <header>
+    <h1 class="text-4xl md:text-5xl font-semibold tracking-tight flex items-center gap-3">
+      <span>☕</span> Coffee Counter <span class="hidden sm:inline">— Michele &amp; Martina</span>
+    </h1>
+    <p class="text-sm text-gray-600 mt-1">Sleek &amp; stupid‑simple caffeine tracker.</p>
+  </header>
+
+  <!-- ADD NEW ENTRY -->
+  <section id="add" class="flex flex-wrap items-center gap-3">
+    <label for="user" class="text-sm">Chi ha bevuto?</label>
+    <select id="user" class="border border-gray-300 rounded-lg px-2 py-1 bg-white shadow-sm">
+      <option>Michele</option>
+      <option>Martina</option>
+    </select>
+    <button id="addBtn" class="bg-black text-white px-4 py-1.5 rounded-lg shadow-md hover:bg-gray-800 transition">+ Aggiungi ☕</button>
+  </section>
+
+  <!-- STATS CARDS -->
+  <section id="stats" class="">
+    <h2 class="text-2xl mb-4">Statistiche</h2>
+    <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-6"></div>
+  </section>
+
+  <!-- HISTORY TABLE -->
+  <section id="history" class="flex-1 overflow-x-auto">
+    <h2 class="text-2xl mb-4">Storico</h2>
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-300">
+          <th class="p-2 text-left font-medium">Quando</th>
+          <th class="p-2 text-left font-medium">Chi</th>
+          <th class="p-2 text-left font-medium">Azioni</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    </table>
+  </section>
+
+<script type="module">
+// ====== BASIC CONFIG ======
+const STORAGE_KEY = 'coffeeEntries';
+
+// ====== STATE HANDLING ======
+let entries = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]').map(e => ({
+  ...e,
+  time: new Date(e.time)
+}));
+
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+
+// ====== CRUD ======
+function addEntry(user) {
+  entries.push({ user, time: new Date() });
+  save();
+  render();
+}
+
+function removeEntry(idx) {
+  entries.splice(idx, 1);
+  save();
+  render();
+}
+
+// ====== HELPERS ======
+const DAY_MS = 24 * 60 * 60 * 1000;
+function startOfDay(d = new Date()) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function startOfYear(d = new Date()) {
+  return new Date(d.getFullYear(), 0, 1);
+}
+function since(date) {
+  return entries.filter(e => e.time >= date);
+}
+
+// ====== RENDER ======
+function renderStats() {
+  const now = new Date();
+  const periods = [
+    { label: 'Oggi', since: startOfDay(now) },
+    { label: 'Ultimi 7 giorni', since: new Date(now - 7 * DAY_MS) },
+    { label: 'YTD', since: startOfYear(now) },
+  ];
+  const grid = document.getElementById('statsGrid');
+  grid.innerHTML = '';
+  periods.forEach(p => {
+    const counts = since(p.since).reduce((obj, e) => {
+      obj[e.user] = (obj[e.user] || 0) + 1;
+      return obj;
+    }, {});
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    const usersHTML = ['Michele', 'Martina']
+      .map(u => `<span class="block">${u}: ${counts[u] || 0}</span>`) // vintage block list
+      .join('');
+    const card = document.createElement('div');
+    card.className = 'p-4 rounded-2xl shadow-lg bg-white border border-gray-200 hover:shadow-xl transition';
+    card.innerHTML = `
+      <h3 class="text-lg mb-2 uppercase tracking-wide">${p.label}</h3>
+      <div class="text-4xl font-bold mb-1">${total}</div>
+      <div class="text-xs text-gray-500 leading-tight">${usersHTML}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function renderHistory() {
+  const tbody = document.getElementById('historyBody');
+  tbody.innerHTML = '';
+  entries
+    .slice()
+    .sort((a, b) => b.time - a.time)
+    .forEach((e, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-gray-200 hover:bg-gray-100';
+      tr.innerHTML = `
+        <td class="p-2">${e.time.toLocaleString('it-IT')}</td>
+        <td class="p-2">${e.user}</td>
+        <td class="p-2"><button class="text-red-600 hover:underline" data-idx="${i}">✕</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  // hook up delete buttons
+  tbody.querySelectorAll('button[data-idx]').forEach(btn => {
+    btn.addEventListener('click', () => removeEntry(parseInt(btn.dataset.idx)));
+  });
+}
+
+function render() {
+  renderStats();
+  renderHistory();
+}
+
+// ====== EVENTS ======
+document.getElementById('addBtn').addEventListener('click', () => {
+  const user = document.getElementById('user').value;
+  addEntry(user);
+});
+
+// ===== INIT =====
+render();
+</script>
+</body>
+</html>
