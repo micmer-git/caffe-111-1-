@@ -76,7 +76,7 @@
     }
   </style>
 </head>
-<body class="paper min-h-screen p-6 flex flex-col gap-8">
+<body class="paper min-h-screen p-6 flex flex-col gap-8 max-w-4xl mx-auto">
   <header>
     <h1 class="text-4xl md:text-5xl font-semibold tracking-tight flex items-center gap-3">
       <span>☕</span> Coffee Counter <span class="hidden sm:inline">— Michele &amp; Martina</span>
@@ -84,7 +84,7 @@
     <p class="text-sm text-[var(--coffee-mid)] mt-1">Shared caffeine tracker — Supabase powered.</p>
   </header>
 
-  <section id="add" class="flex flex-wrap items-center gap-3 bg-white p-4 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
+  <section id="add" class="flex flex-col sm:flex-row flex-wrap items-center gap-3 bg-white p-4 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
     <label class="text-sm">Chi?</label>
     <select id="user" class="border border-[var(--coffee-light)] rounded-lg px-3 py-1 shadow-sm bg-white text-[var(--coffee-dark)]">
       <option>Michele</option>
@@ -114,9 +114,10 @@
 
   <section>
     <h2 class="text-2xl mb-4 mt-8 text-[var(--coffee-dark)]">Grafici</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div class="chart-card"><canvas id="dailyChart"></canvas></div>
       <div class="chart-card"><canvas id="typeChart"></canvas></div>
+      <div class="chart-card"><canvas id="trendChart"></canvas></div>
     </div>
   </section>
 
@@ -158,7 +159,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 /*──────────────────────── STATE ─────────────────────────*/
 let entries = [];             // dati in RAM ordinati (più recente in testa)
 let activeType = 'single';    // default tipo selezionato
-let dailyChart, typeChart;    // istanze Chart.js
+let dailyChart, typeChart, trendChart;    // istanze Chart.js
 
 const DAY = 86_400_000; // Milliseconds in a day
 const HOUR = 3_600_000; // Milliseconds in an hour
@@ -184,6 +185,7 @@ async function addEntry(user, type) {
   entries.unshift(optimistic);
   renderAll(); // Re-render immediately for optimistic UI
   showCoffeeConfirmation(); // Show coffee emojis
+  localStorage.setItem('preferredUser', user);
 
   const { data, error } = await supabase
     .from(TABLE)
@@ -221,6 +223,16 @@ function calculateCurrentCaffeine(userName) {
       totalCaffeine += remainingCaffeine;
     });
   return totalCaffeine.toFixed(1); // Return with one decimal place
+}
+
+function caffeineAt(userName, atTime) {
+  return entries
+    .filter(e => e.user === userName && e.time <= atTime)
+    .reduce((tot, e) => {
+      const caffeineMg = COFFEE_CAFFEINE_MG[e.type] || 0;
+      const h = (atTime - e.time.getTime()) / HOUR;
+      return tot + caffeineMg * Math.pow(0.5, h / CAFFEINE_HALF_LIFE_HOURS);
+    }, 0);
 }
 
 /*────────────────────── UI CONFIRMATION ───────────────────────*/
@@ -311,7 +323,7 @@ function renderStats() {
 
 function renderCharts() {
   /* distruggi istanze vecchie per evitare overlay */
-  dailyChart?.destroy();  typeChart?.destroy();
+  dailyChart?.destroy();  typeChart?.destroy(); trendChart?.destroy();
 
   /* === DAILY LINE CHART (30gg) === */
   const ctxDaily = document.getElementById('dailyChart').getContext('2d');
@@ -403,6 +415,54 @@ function renderCharts() {
                 tooltip:{backgroundColor:'var(--coffee-dark)',
                           titleColor:'#fff',bodyColor:'#fff'}}}
   });
+
+  /* === CAFFEINE TREND (ultime 48h) === */
+  const ctxTrend = document.getElementById('trendChart').getContext('2d');
+  const trendLabels = Array.from({length:48}, (_,i) => {
+    const t = new Date(Date.now() - (47-i)*HOUR);
+    return t.toLocaleString('it-IT', { hour:'2-digit', day:'2-digit', month:'2-digit' });
+  });
+  const michTrend = trendLabels.map((_,i) => caffeineAt('Michele', new Date(Date.now() - (47-i)*HOUR)));
+  const martiTrend = trendLabels.map((_,i) => caffeineAt('Martina', new Date(Date.now() - (47-i)*HOUR)));
+
+  trendChart = new Chart(ctxTrend, {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [
+        {
+          label: 'Michele',
+          data: michTrend,
+          borderColor: 'var(--coffee-dark)',
+          backgroundColor: 'rgba(78,52,46,0.2)',
+          pointRadius: 2,
+          tension: 0.35,
+          fill: false
+        },
+        {
+          label: 'Martina',
+          data: martiTrend,
+          borderColor: 'var(--coffee-mid)',
+          backgroundColor: 'rgba(111,78,55,0.2)',
+          pointRadius: 2,
+          tension: 0.35,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid:{color:'rgba(0,0,0,0.05)'} }
+      },
+      plugins: {
+        legend:{ display:false },
+        tooltip:{ backgroundColor:'var(--coffee-dark)', titleColor:'#fff', bodyColor:'#fff' }
+      }
+    }
+  });
 }
 
 function renderHistory() {
@@ -444,12 +504,19 @@ document.getElementById('typeButtons').addEventListener('click', e=>{
   document.querySelectorAll('.btn-type').forEach(b => b.classList.toggle('active', b === btn));
 
   const user = document.getElementById('user').value;
+  localStorage.setItem('preferredUser', user);
   addEntry(user, activeType); // Directly add entry on button click
 });
 
 // Removed the 'addBtn' event listener as it's no longer needed
 
 /*──────────────────────── BOOT ───────────────────────────*/
+const preferred = localStorage.getItem('preferredUser');
+if (preferred) document.getElementById('user').value = preferred;
+document.getElementById('user').addEventListener('change', e => {
+  localStorage.setItem('preferredUser', e.target.value);
+});
+
 hydrate();    // carica dati iniziali
 </script>
 </body>
