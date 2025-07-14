@@ -44,9 +44,10 @@
     }
 
     .stat-card {
-      @apply min-w-[7rem] p-3 rounded-xl shadow bg-white border border-[var(--coffee-light)] text-center cursor-pointer text-sm;
+      @apply min-w-[7rem] p-3 rounded-xl shadow bg-white border border-[var(--coffee-light)] text-center cursor-pointer text-sm transition-colors;
     }
-    .stat-card.active { @apply bg-[var(--coffee-light)]; }
+    .stat-card:hover { @apply bg-[var(--coffee-light)]; }
+    .stat-card.active { @apply bg-[var(--coffee-light)] font-semibold; }
 
     /* Coffee emoji animation */
     .coffee-rain-container {
@@ -62,26 +63,26 @@
 
     .coffee-emoji {
       position: absolute;
-      font-size: 2rem;
+      font-size: 3rem;
       opacity: 0;
-      animation: fallFade 1.5s forwards ease-out;
+      animation: fallFade 3s forwards ease-out;
       transform: translateY(0) rotate(0);
       will-change: transform, opacity;
     }
 
     @keyframes fallFade {
       0% {
-        opacity: 0.8;
+        opacity: 1;
         transform: translateY(-50px) rotate(0deg);
       }
       100% {
         opacity: 0;
-        transform: translateY(200px) rotate(720deg);
+        transform: translateY(300px) rotate(720deg);
       }
     }
   </style>
 </head>
-<body class="paper min-h-screen p-6 flex flex-col gap-8 max-w-4xl mx-auto">
+<body class="paper min-h-screen p-4 flex flex-col gap-6 max-w-4xl mx-auto">
   <header>
     <h1 class="text-4xl md:text-5xl font-semibold tracking-tight flex items-center gap-3">
       <span>☕</span> Coffee Counter <span class="hidden sm:inline">— Michele &amp; Martina</span>
@@ -89,7 +90,7 @@
     <p class="text-sm text-[var(--coffee-mid)] mt-1">Shared caffeine tracker — Supabase powered.</p>
   </header>
 
-  <section id="add" class="flex flex-col sm:flex-row flex-wrap items-center gap-3 bg-white p-4 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
+  <section id="add" class="flex flex-col sm:flex-row flex-wrap items-center gap-2 bg-white p-3 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
     <label class="text-sm">Chi?</label>
     <select id="user" class="border border-[var(--coffee-light)] rounded-lg px-3 py-1 shadow-sm bg-white text-[var(--coffee-dark)]">
       <option>Michele</option>
@@ -105,31 +106,31 @@
 
     </section>
 
-  <section id="quickInfo" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <section id="quickInfo" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div id="lastCoffeeCard" class="info-card"></div>
       <div id="caffeineCard" class="info-card"></div>
   </section>
 
   <section>
     <h2 class="text-2xl mb-4 text-[var(--coffee-dark)]">Statistiche</h2>
-    <div id="statsGrid" class="flex gap-6 overflow-x-auto pb-2"></div>
+    <div id="statsGrid" class="flex gap-4 overflow-x-auto pb-2"></div>
   </section>
 
   <section>
     <h2 class="text-2xl mb-4 mt-8 text-[var(--coffee-dark)]">Record</h2>
-    <div id="recordsGrid" class="flex gap-6 overflow-x-auto pb-2"></div>
+    <div id="recordsGrid" class="flex gap-4 overflow-x-auto pb-2"></div>
   </section>
 
   <section>
     <h2 class="text-2xl mb-4 mt-8 text-[var(--coffee-dark)]">Grafici</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="chart-card"><canvas id="dailyChart"></canvas></div>
       <div class="chart-card"><canvas id="typeChart"></canvas></div>
       <div class="chart-card"><canvas id="trendChart"></canvas></div>
     </div>
   </section>
 
-  <section id="history" class="flex-1 overflow-x-auto mt-8 bg-white p-4 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
+  <section id="history" class="flex-1 overflow-x-auto mt-6 bg-white p-4 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
     <h2 class="text-2xl mb-4 text-[var(--coffee-dark)]">Storico</h2>
     <table class="min-w-full text-xs">
       <thead>
@@ -294,10 +295,10 @@ function renderLastCoffee() {
   }
   const { type, user, time } = entries[0];
   card.innerHTML = `
-    <h3 class="text-lg mb-1 uppercase tracking-wide text-[var(--coffee-mid)]">Ultimo caffè</h3>
-    <div class="text-3xl font-bold mb-1">${type}</div>
-    <div class="text-sm text-gray-600">${user} — ${time.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</div>
-  `;
+    <div class="whitespace-nowrap overflow-hidden text-ellipsis text-sm">
+      <span class="font-semibold">Ultimo caffè:</span> ${type} — ${user}
+      ${time.toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'})}
+    </div>`;
 }
 
 function renderCaffeineIntake() {
@@ -306,7 +307,7 @@ function renderCaffeineIntake() {
 
   const card = document.getElementById('caffeineCard');
   card.innerHTML = `
-    <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">Caffeina</h3>
+    <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">Caffeina stimata in circolo</h3>
     <div class="flex justify-center gap-6 mb-1">
       <div class="text-center">
         <div class="text-sm text-gray-500">Michele</div>
@@ -317,7 +318,6 @@ function renderCaffeineIntake() {
         <div class="text-3xl font-bold">${martinaCaffeine} mg</div>
       </div>
     </div>
-    <div class="text-sm text-gray-600">stimata in circolo</div>
   `;
 }
 
@@ -468,10 +468,14 @@ function renderCharts() {
     }
   });
 
-  /* === TYPE DOUGHNUT (ultimi 7gg) === */
+  /* === TYPE DOUGHNUT === */
   const ctxType = document.getElementById('typeChart').getContext('2d');
-  const last7   = since(new Date(Date.now()-7*DAY));
-  const tCounts = last7.reduce((o,{type})=>(o[type]=(o[type]||0)+1,o),{});
+  let start;
+  if(chartRange==='oggi') start = startOfDay(new Date());
+  else if(chartRange==='7w') start = new Date(Date.now()-7*DAY);
+  else start = startOfYear(new Date());
+  const subset = since(start);
+  const tCounts = subset.reduce((o,{type})=>(o[type]=(o[type]||0)+1,o),{});
 
   typeChart = new Chart(ctxType,{
     type:'doughnut',
@@ -486,14 +490,17 @@ function renderCharts() {
                           titleColor:'#fff',bodyColor:'#fff'}}}
   });
 
-  /* === CAFFEINE TREND (ultime 48h) === */
+  /* === CAFFEINE TREND === */
   const ctxTrend = document.getElementById('trendChart').getContext('2d');
-  const trendLabels = Array.from({length:48}, (_,i) => {
-    const t = new Date(Date.now() - (47-i)*HOUR);
+  let hours = 48;
+  if(chartRange==='oggi') hours = 24;
+  else if(chartRange==='ytd') hours = 168;
+  const trendLabels = Array.from({length:hours}, (_,i) => {
+    const t = new Date(Date.now() - (hours-1-i)*HOUR);
     return t.toLocaleString('it-IT', { hour:'2-digit', day:'2-digit', month:'2-digit' });
   });
-  const michTrend = trendLabels.map((_,i) => caffeineAt('Michele', new Date(Date.now() - (47-i)*HOUR)));
-  const martiTrend = trendLabels.map((_,i) => caffeineAt('Martina', new Date(Date.now() - (47-i)*HOUR)));
+  const michTrend = trendLabels.map((_,i) => caffeineAt('Michele', new Date(Date.now() - (hours-1-i)*HOUR)));
+  const martiTrend = trendLabels.map((_,i) => caffeineAt('Martina', new Date(Date.now() - (hours-1-i)*HOUR)));
 
   trendChart = new Chart(ctxTrend, {
     type: 'line',
@@ -532,7 +539,7 @@ function renderCharts() {
       },
       plugins: {
         legend:{ display:false },
-        title:{ display:true, text:'Caffeina (ultime 48h)', color:'var(--coffee-dark)' },
+        title:{ display:true, text:'Caffeina (ultime '+hours+'h)', color:'var(--coffee-dark)' },
         tooltip:{ backgroundColor:'var(--coffee-dark)', titleColor:'#fff', bodyColor:'#fff' }
       }
     }
