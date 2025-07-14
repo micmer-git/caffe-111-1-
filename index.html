@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Coffee Counter ☕</title>
+  <title>~ CAFFE?!1?!1 Δ</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm"></script>
@@ -85,13 +85,11 @@
 <body class="paper min-h-screen p-4 flex flex-col gap-6 max-w-4xl mx-auto">
   <header>
     <h1 class="text-4xl md:text-5xl font-semibold tracking-tight flex items-center gap-3">
-      <span>☕</span> Coffee Counter <span class="hidden sm:inline">— Michele &amp; Martina</span>
+      <span>☕</span> ~ CAFFE?!1?!1 Δ
     </h1>
-    <p class="text-sm text-[var(--coffee-mid)] mt-1">Shared caffeine tracker — Supabase powered.</p>
   </header>
 
   <section id="add" class="flex flex-col sm:flex-row flex-wrap items-center gap-2 bg-white p-3 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
-    <label class="text-sm">Chi?</label>
     <select id="user" class="border border-[var(--coffee-light)] rounded-lg px-3 py-1 shadow-sm bg-white text-[var(--coffee-dark)]">
       <option>Michele</option>
       <option>Martina</option>
@@ -112,26 +110,28 @@
   </section>
 
   <section>
-    <h2 class="text-2xl mb-4 text-[var(--coffee-dark)]">Statistiche</h2>
+    <h2 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">Statistiche</h2>
     <div id="statsGrid" class="flex gap-4 overflow-x-auto pb-2"></div>
   </section>
 
   <section>
-    <h2 class="text-2xl mb-4 mt-8 text-[var(--coffee-dark)]">Record</h2>
-    <div id="recordsGrid" class="flex gap-4 overflow-x-auto pb-2"></div>
-  </section>
-
-  <section>
-    <h2 class="text-2xl mb-4 mt-8 text-[var(--coffee-dark)]">Grafici</h2>
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div class="chart-card"><canvas id="dailyChart"></canvas></div>
-      <div class="chart-card"><canvas id="typeChart"></canvas></div>
+    <h2 class="text-lg mb-2 mt-8 uppercase tracking-wide text-[var(--coffee-mid)]">Grafici</h2>
+    <div class="flex flex-col gap-6">
       <div class="chart-card"><canvas id="trendChart"></canvas></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="chart-card"><canvas id="dailyChart"></canvas></div>
+        <div class="chart-card"><canvas id="typeChart"></canvas></div>
+      </div>
     </div>
   </section>
 
+  <section>
+    <h2 class="text-lg mb-2 mt-8 uppercase tracking-wide text-[var(--coffee-mid)]">Record</h2>
+    <div id="recordsGrid" class="flex gap-4 overflow-x-auto pb-2"></div>
+  </section>
+
   <section id="history" class="flex-1 overflow-x-auto mt-6 bg-white p-4 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
-    <h2 class="text-2xl mb-4 text-[var(--coffee-dark)]">Storico</h2>
+    <h2 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">Storico</h2>
     <table class="min-w-full text-xs">
       <thead>
         <tr class="border-b border-[var(--coffee-light)]">
@@ -432,22 +432,6 @@ function renderCharts() {
     })
   }));
 
-  const caffeine = labels.map((_,i)=>{
-    const s = new Date(base - (days-1-i)*DAY);
-    const e = new Date(s.getTime()+DAY);
-    return entries.filter(e1=>e1.time>=s&&e1.time<e)
-      .reduce((tot,e)=>tot+(COFFEE_CAFFEINE_MG[e.type]||0),0);
-  });
-  datasets.push({
-    type:'line',
-    label:'Caffeina mg',
-    yAxisID:'y1',
-    borderColor:'var(--coffee-dark)',
-    borderWidth:2,
-    tension:0.3,
-    fill:false,
-    data:caffeine
-  });
 
   dailyChart = new Chart(ctxDaily,{
     type:'bar',
@@ -457,8 +441,7 @@ function renderCharts() {
       maintainAspectRatio:false,
       scales:{
         x:{stacked:false, grid:{display:false}},
-        y:{beginAtZero:true, stacked:false, grid:{color:'rgba(0,0,0,0.05)'}},
-        y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}}
+        y:{beginAtZero:true, stacked:false, grid:{color:'rgba(0,0,0,0.05)'}}
       },
       plugins:{
         legend:{position:'top', labels:{color:'var(--coffee-dark)'}},
