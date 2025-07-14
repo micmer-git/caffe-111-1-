@@ -109,7 +109,7 @@
 
   <section>
     <h2 class="text-2xl mb-4 text-[var(--coffee-dark)]">Statistiche</h2>
-    <div id="statsGrid" class="grid grid-cols-1 sm:grid-cols-3 gap-6"></div>
+    <div id="statsGrid" class="flex gap-6 overflow-x-auto pb-2"></div>
   </section>
 
   <section>
@@ -151,6 +151,20 @@ const COFFEE_CAFFEINE_MG = {
 };
 
 const CAFFEINE_HALF_LIFE_HOURS = 5; // Average caffeine half-life
+
+const USER_PHYSIO = {
+  Michele: { weightKg: 72, weeklyActivityH: 20 },
+  Martina: { weightKg: 46, weeklyActivityH: 7 }
+};
+
+function halfLifeFor(userName) {
+  const base = CAFFEINE_HALF_LIFE_HOURS;
+  const u = USER_PHYSIO[userName];
+  if (!u) return base;
+  let hl = base * (70 / u.weightKg);
+  if (u.weeklyActivityH) hl -= u.weeklyActivityH * 0.05;
+  return Math.max(2.5, hl);
+}
 
 /*──────────────────────── INIT ──────────────────────────*/
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
@@ -219,7 +233,8 @@ function calculateCurrentCaffeine(userName) {
       const caffeineMg = COFFEE_CAFFEINE_MG[entry.type] || 0;
       const timeElapsedHours = (now - entry.time.getTime()) / HOUR;
       // Caffeine remaining = initial caffeine * (0.5 ^ (time elapsed / half-life))
-      const remainingCaffeine = caffeineMg * Math.pow(0.5, timeElapsedHours / CAFFEINE_HALF_LIFE_HOURS);
+      const hl = halfLifeFor(userName);
+      const remainingCaffeine = caffeineMg * Math.pow(0.5, timeElapsedHours / hl);
       totalCaffeine += remainingCaffeine;
     });
   return totalCaffeine.toFixed(1); // Return with one decimal place
@@ -231,7 +246,8 @@ function caffeineAt(userName, atTime) {
     .reduce((tot, e) => {
       const caffeineMg = COFFEE_CAFFEINE_MG[e.type] || 0;
       const h = (atTime - e.time.getTime()) / HOUR;
-      return tot + caffeineMg * Math.pow(0.5, h / CAFFEINE_HALF_LIFE_HOURS);
+      const hl = halfLifeFor(userName);
+      return tot + caffeineMg * Math.pow(0.5, h / hl);
     }, 0);
 }
 
@@ -239,11 +255,12 @@ function caffeineAt(userName, atTime) {
 function showCoffeeConfirmation() {
   const container = document.getElementById('coffeeRainContainer');
   const numberOfEmojis = 10; // Number of emojis to display
+  const icons = ['☕', 'Δ', '~', '☁️'];
 
   for (let i = 0; i < numberOfEmojis; i++) {
     const emoji = document.createElement('div');
     emoji.className = 'coffee-emoji';
-    emoji.textContent = '☕'; // The coffee emoji
+    emoji.textContent = icons[Math.floor(Math.random() * icons.length)];
 
     // Random position within the top part of the screen
     emoji.style.left = `${Math.random() * 100}vw`;
@@ -309,7 +326,7 @@ function renderStats() {
     const total  = subset.length;
 
     grid.insertAdjacentHTML('beforeend', `
-      <div class="p-4 rounded-2xl shadow-lg bg-white border border-[var(--coffee-light)] hover:shadow-xl transition transform hover:-translate-y-1">
+      <div class="min-w-[9rem] p-4 rounded-2xl shadow-lg bg-white border border-[var(--coffee-light)] hover:shadow-xl transition transform hover:-translate-y-1 whitespace-nowrap">
         <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">${label}</h3>
         <div class="text-4xl font-bold mb-1 text-[var(--coffee-dark)]">${total}</div>
         <div class="text-xs text-gray-500">
@@ -358,6 +375,7 @@ function renderCharts() {
           pointRadius: 3,
           pointBackgroundColor: 'var(--coffee-dark)',
           tension: 0.35,
+          borderWidth: 3,
           fill: false // No fill for individual lines
         },
         {
@@ -368,6 +386,8 @@ function renderCharts() {
           pointRadius: 3,
           pointBackgroundColor: 'var(--coffee-mid)',
           tension: 0.35,
+          borderWidth: 3,
+          borderDash: [6,3],
           fill: false // No fill for individual lines
         }
       ]
@@ -437,6 +457,7 @@ function renderCharts() {
           backgroundColor: 'rgba(78,52,46,0.2)',
           pointRadius: 2,
           tension: 0.35,
+          borderWidth: 3,
           fill: false
         },
         {
@@ -446,6 +467,8 @@ function renderCharts() {
           backgroundColor: 'rgba(111,78,55,0.2)',
           pointRadius: 2,
           tension: 0.35,
+          borderWidth: 3,
+          borderDash: [6,3],
           fill: false
         }
       ]
