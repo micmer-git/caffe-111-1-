@@ -96,11 +96,11 @@
       <option>Martina</option>
     </select>
 
-    <div id="typeButtons" class="flex gap-1 flex-nowrap whitespace-nowrap overflow-x-auto">
-      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="single">Single</button>
-      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="moka4">Moka 4</button>
-      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="americano">Americano</button>
-      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="decaf">Decaf</button>
+    <div id="typeButtons" class="flex gap-1 flex-wrap sm:flex-nowrap whitespace-nowrap overflow-x-auto">
+      <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="single">Single</button>
+      <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="moka4">Moka 4</button>
+      <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="americano">Americano</button>
+      <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="decaf">Decaf</button>
     </div>
 
     </section>
@@ -116,6 +116,11 @@
   </section>
 
   <section>
+    <h2 class="text-2xl mb-4 mt-8 text-[var(--coffee-dark)]">Record</h2>
+    <div id="recordsGrid" class="flex gap-6 overflow-x-auto pb-2"></div>
+  </section>
+
+  <section>
     <h2 class="text-2xl mb-4 mt-8 text-[var(--coffee-dark)]">Grafici</h2>
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div class="chart-card"><canvas id="dailyChart"></canvas></div>
@@ -126,7 +131,7 @@
 
   <section id="history" class="flex-1 overflow-x-auto mt-8 bg-white p-4 rounded-2xl shadow-lg border border-[var(--coffee-light)]">
     <h2 class="text-2xl mb-4 text-[var(--coffee-dark)]">Storico</h2>
-    <table class="min-w-full text-sm">
+    <table class="min-w-full text-xs">
       <thead>
         <tr class="border-b border-[var(--coffee-light)]">
           <th class="p-2 text-left font-medium text-[var(--coffee-mid)]">Quando</th>
@@ -172,6 +177,7 @@ function halfLifeFor(userName) {
 /*──────────────────────── INIT ──────────────────────────*/
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+Chart.defaults.font.family = 'IBM Plex Mono, monospace';
 
 /*──────────────────────── STATE ─────────────────────────*/
 let entries = [];             // dati in RAM ordinati (più recente in testa)
@@ -303,11 +309,11 @@ function renderCaffeineIntake() {
     <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">Caffeina</h3>
     <div class="flex justify-center gap-6 mb-1">
       <div class="text-center">
-        <div class="text-xs text-gray-500">Michele</div>
+        <div class="text-sm text-gray-500">Michele</div>
         <div class="text-3xl font-bold">${micheleCaffeine} mg</div>
       </div>
       <div class="text-center">
-        <div class="text-xs text-gray-500">Martina</div>
+        <div class="text-sm text-gray-500">Martina</div>
         <div class="text-3xl font-bold">${martinaCaffeine} mg</div>
       </div>
     </div>
@@ -336,35 +342,63 @@ function renderStats() {
         <div class="font-semibold mb-1">${label}</div>
         <div class="text-2xl font-bold mb-1 text-[var(--coffee-dark)]">${total}</div>
         <div class="text-[10px] text-gray-500">
-            M:${counts.Michele||0} &nbsp; T:${counts.Martina||0}
+            Michele: ${counts.Michele||0} &nbsp; Martina: ${counts.Martina||0}
         </div>
       </div>
     `);
   });
 
-  // add all time stats
+  renderRecords();
+}
+
+function getRecords() {
   const dayCounts = {};
-  entries.forEach(e=>{
-    const k=startOfDay(new Date(e.time)).getTime();
-    dayCounts[k]=(dayCounts[k]||0)+1;
+  entries.forEach(e => {
+    const k = startOfDay(new Date(e.time)).getTime();
+    dayCounts[k] = (dayCounts[k] || 0) + 1;
   });
-  const maxDay = Math.max(0, ...Object.values(dayCounts));
-  let maxCaff=0;
+  let maxDay = 0, maxDayDate = null;
+  Object.entries(dayCounts).forEach(([d,c])=>{ if(c>maxDay){maxDay=c;maxDayDate=new Date(Number(d));} });
+
+  let maxCaff = 0, maxCaffUser='', maxCaffTime=null;
   entries.forEach(e=>{
-    ['Michele','Martina'].forEach(u=>{const v=caffeineAt(u,e.time);if(v>maxCaff)maxCaff=v;});
+    ['Michele','Martina'].forEach(u=>{
+      const v = caffeineAt(u,e.time);
+      if(v>maxCaff){maxCaff=v;maxCaffUser=u;maxCaffTime=e.time;}
+    });
   });
-  let max4h=0;
-  entries.forEach((e,i)=>{
+
+  let max4h=0, max4hTime=null;
+  entries.forEach(e=>{
     const end=e.time.getTime()+4*HOUR;
     const c=entries.filter(x=>x.time>=e.time && x.time<=new Date(end)).length;
-    if(c>max4h)max4h=c;
+    if(c>max4h){max4h=c;max4hTime=e.time;}
   });
-  grid.insertAdjacentHTML('beforeend', `
-    <div class="stat-card" id="allTimeStats">
-      <div class="font-semibold mb-1">Record</div>
-      <div class="text-[10px] text-gray-700">Caffè/giorno: ${maxDay}</div>
-      <div class="text-[10px] text-gray-700">Max caffeina: ${maxCaff.toFixed(0)} mg</div>
-      <div class="text-[10px] text-gray-700">Caffè in 4h: ${max4h}</div>
+
+  return {maxDay,maxDayDate,maxCaff,maxCaffUser,maxCaffTime,max4h,max4hTime};
+}
+
+function renderRecords() {
+  const grid = document.getElementById('recordsGrid');
+  if(!grid) return;
+  grid.innerHTML='';
+  const r = getRecords();
+  if(!r.maxDay) return;
+  grid.insertAdjacentHTML('beforeend',`
+    <div class="stat-card">
+      <div class="font-semibold mb-1">Caffè/giorno</div>
+      <div class="text-2xl font-bold mb-1 text-[var(--coffee-dark)]">${r.maxDay}</div>
+      <div class="text-[10px] text-gray-500">${r.maxDayDate.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})}</div>
+    </div>
+    <div class="stat-card">
+      <div class="font-semibold mb-1">Max caffeina</div>
+      <div class="text-2xl font-bold mb-1 text-[var(--coffee-dark)]">${r.maxCaff.toFixed(0)} mg</div>
+      <div class="text-[10px] text-gray-500">${r.maxCaffUser} ${r.maxCaffTime.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})}</div>
+    </div>
+    <div class="stat-card">
+      <div class="font-semibold mb-1">Caffè in 4h</div>
+      <div class="text-2xl font-bold mb-1 text-[var(--coffee-dark)]">${r.max4h}</div>
+      <div class="text-[10px] text-gray-500">${r.max4hTime.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})}</div>
     </div>
   `);
 }
@@ -375,7 +409,7 @@ function renderCharts() {
   const ctxDaily = document.getElementById('dailyChart').getContext('2d');
 
   let days = 30;
-  const base = today();
+  let base = entries.length ? startOfDay(new Date(entries[0].time)) : today();
   if(chartRange==='oggi') days = 1;
   else if(chartRange==='7w') days = 49;
   else if(chartRange==='ytd') days = Math.ceil((base - startOfYear(new Date(base)))/DAY)+1;
@@ -385,17 +419,17 @@ function renderCharts() {
     return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'});
   });
 
-  const types = Object.keys(COFFEE_CAFFEINE_MG);
-  const colors = ['#4e342e','#6f4e37','#8d6e63','#d7ccc8'];
-  const datasets = types.map((t,idx)=>({
-    label:t,
-    backgroundColor: colors[idx%colors.length],
+  const users = ['Michele','Martina'];
+  const colors = ['#4e342e','#6f4e37'];
+  const datasets = users.map((u,idx)=>({
+    label:u,
+    backgroundColor: colors[idx],
+    borderColor: colors[idx],
     data: labels.map((_,i)=>{
       const s = new Date(base - (days-1-i)*DAY);
       const e = new Date(s.getTime()+DAY);
-      return entries.filter(e1=>e1.time>=s&&e1.time<e&&e1.type===t).length;
-    }),
-    stack:'counts'
+      return entries.filter(e1=>e1.time>=s&&e1.time<e&&e1.user===u).length;
+    })
   }));
 
   const caffeine = labels.map((_,i)=>{
@@ -422,8 +456,8 @@ function renderCharts() {
       responsive:true,
       maintainAspectRatio:false,
       scales:{
-        x:{stacked:true, grid:{display:false}},
-        y:{beginAtZero:true, stacked:true, grid:{color:'rgba(0,0,0,0.05)'}},
+        x:{stacked:false, grid:{display:false}},
+        y:{beginAtZero:true, stacked:false, grid:{color:'rgba(0,0,0,0.05)'}},
         y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}}
       },
       plugins:{
