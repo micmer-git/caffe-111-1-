@@ -43,6 +43,11 @@
       @apply flex-1 p-4 rounded-2xl shadow-lg bg-white border border-[var(--coffee-light)] flex flex-col justify-center items-center text-center;
     }
 
+    .stat-card {
+      @apply min-w-[7rem] p-3 rounded-xl shadow bg-white border border-[var(--coffee-light)] text-center cursor-pointer text-sm;
+    }
+    .stat-card.active { @apply bg-[var(--coffee-light)]; }
+
     /* Coffee emoji animation */
     .coffee-rain-container {
       position: fixed;
@@ -91,20 +96,18 @@
       <option>Martina</option>
     </select>
 
-    <label class="text-sm ml-4">Tipo:</label>
-    <div id="typeButtons" class="flex gap-1">
-      <button class="btn-type px-3 py-1 rounded-lg" data-type="single">Single</button>
-      <button class="btn-type px-3 py-1 rounded-lg" data-type="moka4">Moka 4</button>
-      <button class="btn-type px-3 py-1 rounded-lg" data-type="americano">Americano</button>
-      <button class="btn-type px-3 py-1 rounded-lg" data-type="decaf">Decaf</button>
+    <div id="typeButtons" class="flex gap-1 flex-nowrap whitespace-nowrap overflow-x-auto">
+      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="single">Single</button>
+      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="moka4">Moka 4</button>
+      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="americano">Americano</button>
+      <button class="btn-type px-3 py-1 rounded-lg whitespace-nowrap" data-type="decaf">Decaf</button>
     </div>
 
     </section>
 
   <section id="quickInfo" class="grid grid-cols-1 md:grid-cols-3 gap-6">
-    <div id="lastCoffeeCard" class="info-card"></div>
-    <div id="micheleCaffeineCard" class="info-card"></div>
-    <div id="martinaCaffeineCard" class="info-card"></div>
+      <div id="lastCoffeeCard" class="info-card"></div>
+      <div id="caffeineCard" class="info-card"></div>
   </section>
 
   <section>
@@ -181,6 +184,7 @@ const today = () => new Date(new Date().setHours(0,0,0,0));
 const startOfDay = d => new Date(d.setHours(0,0,0,0));
 const startOfYear = d => new Date(d.getFullYear(), 0, 1);
 const since = date => entries.filter(e => e.time >= date);
+let chartRange = '7w';
 
 /*─────────────────── CRUD + REALTIME ───────────────────*/
 async function hydrate() {
@@ -286,7 +290,7 @@ function renderLastCoffee() {
   card.innerHTML = `
     <h3 class="text-lg mb-1 uppercase tracking-wide text-[var(--coffee-mid)]">Ultimo caffè</h3>
     <div class="text-3xl font-bold mb-1">${type}</div>
-    <div class="text-sm text-gray-600">${user} — ${time.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })}</div>
+    <div class="text-sm text-gray-600">${user} — ${time.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' })}</div>
   `;
 }
 
@@ -294,17 +298,19 @@ function renderCaffeineIntake() {
   const micheleCaffeine = calculateCurrentCaffeine('Michele');
   const martinaCaffeine = calculateCurrentCaffeine('Martina');
 
-  const micheleCard = document.getElementById('micheleCaffeineCard');
-  micheleCard.innerHTML = `
-    <h3 class="text-lg mb-1 uppercase tracking-wide text-[var(--coffee-mid)]">Caffeina Michele</h3>
-    <div class="text-3xl font-bold mb-1">${micheleCaffeine} mg</div>
-    <div class="text-sm text-gray-600">stimata in circolo</div>
-  `;
-
-  const martinaCard = document.getElementById('martinaCaffeineCard');
-  martinaCard.innerHTML = `
-    <h3 class="text-lg mb-1 uppercase tracking-wide text-[var(--coffee-mid)]">Caffeina Martina</h3>
-    <div class="text-3xl font-bold mb-1">${martinaCaffeine} mg</div>
+  const card = document.getElementById('caffeineCard');
+  card.innerHTML = `
+    <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">Caffeina</h3>
+    <div class="flex justify-center gap-6 mb-1">
+      <div class="text-center">
+        <div class="text-xs text-gray-500">Michele</div>
+        <div class="text-3xl font-bold">${micheleCaffeine} mg</div>
+      </div>
+      <div class="text-center">
+        <div class="text-xs text-gray-500">Martina</div>
+        <div class="text-3xl font-bold">${martinaCaffeine} mg</div>
+      </div>
+    </div>
     <div class="text-sm text-gray-600">stimata in circolo</div>
   `;
 }
@@ -315,105 +321,115 @@ function renderStats() {
 
   const now = new Date();
   const blocks = [
-    { label: 'Oggi',        from: startOfDay(new Date(now)) },
-    { label: 'Ultimi 7 gg', from: new Date(now - 7 * DAY) },
-    { label: 'YTD',         from: startOfYear(new Date(now)) },
+    { label: 'Oggi',        from: startOfDay(new Date(now)), range:'oggi' },
+    { label: 'Ultimi 7 gg', from: new Date(now - 7 * DAY),   range:'7w'   },
+    { label: 'YTD',         from: startOfYear(new Date(now)), range:'ytd'  },
   ];
 
-  blocks.forEach(({ label, from }) => {
+  blocks.forEach(({ label, from, range }) => {
     const subset = since(from);
     const counts = subset.reduce((acc,{user}) => (acc[user]=(acc[user]||0)+1, acc), {});
     const total  = subset.length;
 
     grid.insertAdjacentHTML('beforeend', `
-      <div class="min-w-[9rem] p-4 rounded-2xl shadow-lg bg-white border border-[var(--coffee-light)] hover:shadow-xl transition transform hover:-translate-y-1 whitespace-nowrap">
-        <h3 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">${label}</h3>
-        <div class="text-4xl font-bold mb-1 text-[var(--coffee-dark)]">${total}</div>
-        <div class="text-xs text-gray-500">
-            Michele: ${counts.Michele||0}<br>
-            Martina: ${counts.Martina||0}
+      <div class="stat-card ${range===chartRange?'active':''}" data-range="${range}">
+        <div class="font-semibold mb-1">${label}</div>
+        <div class="text-2xl font-bold mb-1 text-[var(--coffee-dark)]">${total}</div>
+        <div class="text-[10px] text-gray-500">
+            M:${counts.Michele||0} &nbsp; T:${counts.Martina||0}
         </div>
       </div>
     `);
   });
+
+  // add all time stats
+  const dayCounts = {};
+  entries.forEach(e=>{
+    const k=startOfDay(new Date(e.time)).getTime();
+    dayCounts[k]=(dayCounts[k]||0)+1;
+  });
+  const maxDay = Math.max(0, ...Object.values(dayCounts));
+  let maxCaff=0;
+  entries.forEach(e=>{
+    ['Michele','Martina'].forEach(u=>{const v=caffeineAt(u,e.time);if(v>maxCaff)maxCaff=v;});
+  });
+  let max4h=0;
+  entries.forEach((e,i)=>{
+    const end=e.time.getTime()+4*HOUR;
+    const c=entries.filter(x=>x.time>=e.time && x.time<=new Date(end)).length;
+    if(c>max4h)max4h=c;
+  });
+  grid.insertAdjacentHTML('beforeend', `
+    <div class="stat-card" id="allTimeStats">
+      <div class="font-semibold mb-1">Record</div>
+      <div class="text-[10px] text-gray-700">Caffè/giorno: ${maxDay}</div>
+      <div class="text-[10px] text-gray-700">Max caffeina: ${maxCaff.toFixed(0)} mg</div>
+      <div class="text-[10px] text-gray-700">Caffè in 4h: ${max4h}</div>
+    </div>
+  `);
 }
 
 function renderCharts() {
-  /* distruggi istanze vecchie per evitare overlay */
   dailyChart?.destroy();  typeChart?.destroy(); trendChart?.destroy();
 
-  /* === DAILY LINE CHART (30gg) === */
   const ctxDaily = document.getElementById('dailyChart').getContext('2d');
+
+  let days = 30;
   const base = today();
-  const labels = Array.from({length:30},(_,i)=>{
-    const d = new Date(base - (29-i)*DAY);
+  if(chartRange==='oggi') days = 1;
+  else if(chartRange==='7w') days = 49;
+  else if(chartRange==='ytd') days = Math.ceil((base - startOfYear(new Date(base)))/DAY)+1;
+
+  const labels = Array.from({length:days},(_,i)=>{
+    const d = new Date(base - (days-1-i)*DAY);
     return d.toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit'});
   });
 
-  const michCounts = labels.map((_,i)=>{
-    const s = new Date(base - (29-i)*DAY);
-    const e = new Date(s.getTime()+DAY);
-    return entries.filter(e1 => e1.time>=s && e1.time<e && e1.user === 'Michele').length;
-  });
+  const types = Object.keys(COFFEE_CAFFEINE_MG);
+  const colors = ['#4e342e','#6f4e37','#8d6e63','#d7ccc8'];
+  const datasets = types.map((t,idx)=>({
+    label:t,
+    backgroundColor: colors[idx%colors.length],
+    data: labels.map((_,i)=>{
+      const s = new Date(base - (days-1-i)*DAY);
+      const e = new Date(s.getTime()+DAY);
+      return entries.filter(e1=>e1.time>=s&&e1.time<e&&e1.type===t).length;
+    }),
+    stack:'counts'
+  }));
 
-  const martiCounts = labels.map((_,i)=>{
-    const s = new Date(base - (29-i)*DAY);
+  const caffeine = labels.map((_,i)=>{
+    const s = new Date(base - (days-1-i)*DAY);
     const e = new Date(s.getTime()+DAY);
-    return entries.filter(e1 => e1.time>=s && e1.time<e && e1.user === 'Martina').length;
+    return entries.filter(e1=>e1.time>=s&&e1.time<e)
+      .reduce((tot,e)=>tot+(COFFEE_CAFFEINE_MG[e.type]||0),0);
+  });
+  datasets.push({
+    type:'line',
+    label:'Caffeina mg',
+    yAxisID:'y1',
+    borderColor:'var(--coffee-dark)',
+    borderWidth:2,
+    tension:0.3,
+    fill:false,
+    data:caffeine
   });
 
   dailyChart = new Chart(ctxDaily,{
-    type:'line',
-    data:{
-      labels,
-      datasets:[
-        {
-          label: 'Michele',
-          data: michCounts,
-          borderColor: 'var(--coffee-dark)',
-          backgroundColor: 'rgba(78, 52, 46, 0.2)', // Slightly transparent coffee dark
-          pointRadius: 3,
-          pointBackgroundColor: 'var(--coffee-dark)',
-          tension: 0.35,
-          borderWidth: 3,
-          fill: false // No fill for individual lines
-        },
-        {
-          label: 'Martina',
-          data: martiCounts,
-          borderColor: 'var(--coffee-mid)',
-          backgroundColor: 'rgba(111, 78, 55, 0.2)', // Slightly transparent coffee mid
-          pointRadius: 3,
-          pointBackgroundColor: 'var(--coffee-mid)',
-          tension: 0.35,
-          borderWidth: 3,
-          borderDash: [6,3],
-          fill: false // No fill for individual lines
-        }
-      ]
-    },
+    type:'bar',
+    data:{labels,datasets},
     options:{
       responsive:true,
       maintainAspectRatio:false,
       scales:{
-        x:{grid:{display:false}},
-        y:{beginAtZero:true,
-          grid:{color:'rgba(0,0,0,0.05)'}
-        }
+        x:{stacked:true, grid:{display:false}},
+        y:{beginAtZero:true, stacked:true, grid:{color:'rgba(0,0,0,0.05)'}},
+        y1:{beginAtZero:true, position:'right', grid:{drawOnChartArea:false}}
       },
       plugins:{
-        legend:{
-          display: true, // Show legend for multiple datasets
-          position: 'top',
-          labels: {
-            color: 'var(--coffee-dark)'
-          }
-        },
-        tooltip:{
-          backgroundColor:'var(--coffee-dark)',
-          titleColor:'#fff',
-          bodyColor:'#fff'
-        }
+        legend:{position:'top', labels:{color:'var(--coffee-dark)'}},
+        title:{display:true,text:'Caffè per giorno',color:'var(--coffee-dark)'},
+        tooltip:{backgroundColor:'var(--coffee-dark)',titleColor:'#fff',bodyColor:'#fff'}
       }
     }
   });
@@ -482,6 +498,7 @@ function renderCharts() {
       },
       plugins: {
         legend:{ display:false },
+        title:{ display:true, text:'Caffeina (ultime 48h)', color:'var(--coffee-dark)' },
         tooltip:{ backgroundColor:'var(--coffee-dark)', titleColor:'#fff', bodyColor:'#fff' }
       }
     }
@@ -497,7 +514,7 @@ function renderHistory() {
     tr.className = 'border-b border-[var(--coffee-light)] last:border-b-0'; // Remove border from last row
 
     tr.innerHTML = `
-      <td class="p-2">${time.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+      <td class="p-2">${time.toLocaleString('it-IT', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short', year: 'numeric' })}</td>
       <td class="p-2">${user}</td>
       <td class="p-2 capitalize">${type}</td>`;
     tbody.appendChild(tr);
@@ -529,6 +546,15 @@ document.getElementById('typeButtons').addEventListener('click', e=>{
   const user = document.getElementById('user').value;
   localStorage.setItem('preferredUser', user);
   addEntry(user, activeType); // Directly add entry on button click
+});
+
+// Change chart range when clicking stats
+document.getElementById('statsGrid').addEventListener('click', e => {
+  const card = e.target.closest('[data-range]');
+  if(!card) return;
+  chartRange = card.dataset.range;
+  renderStats();
+  renderCharts();
 });
 
 // Removed the 'addBtn' event listener as it's no longer needed
