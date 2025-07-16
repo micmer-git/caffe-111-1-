@@ -44,10 +44,10 @@
     }
 
     .stat-card {
-      @apply min-w-[7rem] p-3 rounded-xl shadow bg-white border border-[var(--coffee-light)] text-center cursor-pointer text-sm transition-colors;
+      @apply min-w-[7rem] p-3 rounded-xl shadow bg-white border border-[var(--coffee-light)] text-center cursor-pointer text-sm transition-all;
     }
-    .stat-card:hover { @apply bg-[var(--coffee-light)]; }
-    .stat-card.active { @apply bg-[var(--coffee-light)] font-semibold; }
+    .stat-card:hover { @apply bg-[var(--coffee-light)] shadow-lg; }
+    .stat-card.active { @apply bg-[var(--coffee-light)] font-semibold shadow-lg; }
 
     /* Coffee emoji animation */
     .coffee-rain-container {
@@ -95,6 +95,9 @@
       <option>Martina</option>
     </select>
 
+    <input type="date" id="entryDate" class="border border-[var(--coffee-light)] rounded-lg px-2 py-1 shadow-sm bg-white text-[var(--coffee-dark)]" />
+    <input type="time" id="entryTime" class="border border-[var(--coffee-light)] rounded-lg px-2 py-1 shadow-sm bg-white text-[var(--coffee-dark)]" />
+
     <div id="typeButtons" class="flex gap-1 flex-wrap sm:flex-nowrap whitespace-nowrap overflow-x-auto">
       <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="single">Single</button>
       <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="moka4">Moka 4</button>
@@ -111,6 +114,7 @@
 
   <section>
     <h2 class="text-lg mb-2 uppercase tracking-wide text-[var(--coffee-mid)]">Statistiche</h2>
+    <p class="text-[10px] text-gray-500 mb-1">Tocca un blocco per aggiornare i grafici</p>
     <div id="statsGrid" class="flex gap-4 overflow-x-auto pb-2"></div>
   </section>
 
@@ -205,8 +209,8 @@ async function hydrate() {
 }
 
 /* add row */
-async function addEntry(user, type) {
-  const optimistic = { id: crypto.randomUUID(), user, type, time: new Date(), _optimistic:true };
+async function addEntry(user, type, time = new Date()) {
+  const optimistic = { id: crypto.randomUUID(), user, type, time: new Date(time), _optimistic:true };
   entries.unshift(optimistic);
   renderAll(); // Re-render immediately for optimistic UI
   showCoffeeConfirmation(); // Show coffee emojis
@@ -214,7 +218,7 @@ async function addEntry(user, type) {
 
   const { data, error } = await supabase
     .from(TABLE)
-    .insert({ user, type })
+    .insert({ user, type, time })
     .select()
     .single();
 
@@ -352,13 +356,20 @@ function renderStats() {
 }
 
 function getRecords() {
-  const dayCounts = {};
+  const dayUserCounts = {};
   entries.forEach(e => {
-    const k = startOfDay(new Date(e.time)).getTime();
-    dayCounts[k] = (dayCounts[k] || 0) + 1;
+    const k = `${e.user}-${startOfDay(new Date(e.time)).getTime()}`;
+    dayUserCounts[k] = (dayUserCounts[k] || 0) + 1;
   });
-  let maxDay = 0, maxDayDate = null;
-  Object.entries(dayCounts).forEach(([d,c])=>{ if(c>maxDay){maxDay=c;maxDayDate=new Date(Number(d));} });
+  let maxDay = 0, maxDayUser = '', maxDayDate = null;
+  Object.entries(dayUserCounts).forEach(([k,c])=>{
+    if(c>maxDay){
+      maxDay=c;
+      const [u,d] = k.split('-');
+      maxDayUser=u;
+      maxDayDate=new Date(Number(d));
+    }
+  });
 
   let maxCaff = 0, maxCaffUser='', maxCaffTime=null;
   entries.forEach(e=>{
@@ -368,14 +379,16 @@ function getRecords() {
     });
   });
 
-  let max4h=0, max4hTime=null;
-  entries.forEach(e=>{
-    const end=e.time.getTime()+4*HOUR;
-    const c=entries.filter(x=>x.time>=e.time && x.time<=new Date(end)).length;
-    if(c>max4h){max4h=c;max4hTime=e.time;}
+  let max4h=0, max4hUser='', max4hTime=null;
+  ['Michele','Martina'].forEach(u=>{
+    entries.filter(e=>e.user===u).forEach(e=>{
+      const end=e.time.getTime()+4*HOUR;
+      const c=entries.filter(x=>x.user===u && x.time>=e.time && x.time<=new Date(end)).length;
+      if(c>max4h){max4h=c;max4hTime=e.time;max4hUser=u;}
+    });
   });
 
-  return {maxDay,maxDayDate,maxCaff,maxCaffUser,maxCaffTime,max4h,max4hTime};
+  return {maxDay,maxDayUser,maxDayDate,maxCaff,maxCaffUser,maxCaffTime,max4h,max4hUser,max4hTime};
 }
 
 function renderRecords() {
@@ -388,7 +401,7 @@ function renderRecords() {
     <div class="stat-card">
       <div class="font-semibold mb-1">Caffè/giorno</div>
       <div class="text-2xl font-bold mb-1 text-[var(--coffee-dark)]">${r.maxDay}</div>
-      <div class="text-[10px] text-gray-500">${r.maxDayDate.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})}</div>
+      <div class="text-[10px] text-gray-500">${r.maxDayUser} ${r.maxDayDate.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})}</div>
     </div>
     <div class="stat-card">
       <div class="font-semibold mb-1">Max caffeina</div>
@@ -398,7 +411,7 @@ function renderRecords() {
     <div class="stat-card">
       <div class="font-semibold mb-1">Caffè in 4h</div>
       <div class="text-2xl font-bold mb-1 text-[var(--coffee-dark)]">${r.max4h}</div>
-      <div class="text-[10px] text-gray-500">${r.max4hTime.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})}</div>
+      <div class="text-[10px] text-gray-500">${r.max4hUser} ${r.max4hTime.toLocaleDateString('it-IT',{day:'2-digit',month:'short'})}</div>
     </div>
   `);
 }
@@ -568,8 +581,19 @@ document.getElementById('typeButtons').addEventListener('click', e=>{
   document.querySelectorAll('.btn-type').forEach(b => b.classList.toggle('active', b === btn));
 
   const user = document.getElementById('user').value;
+  const d = document.getElementById('entryDate').value;
+  const t = document.getElementById('entryTime').value;
+  let when = new Date();
+  if(d || t) {
+    const date = d || new Date().toISOString().slice(0,10);
+    const time = t || new Date().toTimeString().slice(0,5);
+    when = new Date(`${date}T${time}`);
+  }
   localStorage.setItem('preferredUser', user);
-  addEntry(user, activeType); // Directly add entry on button click
+  addEntry(user, activeType, when); // Directly add entry on button click
+  const now = new Date();
+  document.getElementById('entryDate').value = now.toISOString().slice(0,10);
+  document.getElementById('entryTime').value = now.toTimeString().slice(0,5);
 });
 
 // Change chart range when clicking stats
@@ -586,6 +610,9 @@ document.getElementById('statsGrid').addEventListener('click', e => {
 /*──────────────────────── BOOT ───────────────────────────*/
 const preferred = localStorage.getItem('preferredUser');
 if (preferred) document.getElementById('user').value = preferred;
+const nowBoot = new Date();
+document.getElementById('entryDate').value = nowBoot.toISOString().slice(0,10);
+document.getElementById('entryTime').value = nowBoot.toTimeString().slice(0,5);
 document.getElementById('user').addEventListener('change', e => {
   localStorage.setItem('preferredUser', e.target.value);
 });
