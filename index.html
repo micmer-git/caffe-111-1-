@@ -100,8 +100,10 @@
 
     <div id="typeButtons" class="flex gap-1 flex-wrap sm:flex-nowrap whitespace-nowrap overflow-x-auto">
       <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="single">Single</button>
+      <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="double">Double</button>
       <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="moka4">Moka 4</button>
       <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="americano">Americano</button>
+      <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="decaf americano">Decaf Americano</button>
       <button class="btn-type px-2 sm:px-3 py-1 rounded-lg whitespace-nowrap" data-type="decaf">Decaf</button>
     </div>
 
@@ -159,10 +161,12 @@ const TABLE = 'coffee_entries';
 const COFFEE_CAFFEINE_MG = {
   single: 80,    // Single espresso shot
   doppio: 120,    // Doppio espresso shot
+  double: 120,    // Double espresso (alias of doppio)
 
   moka4: 160,   // Moka pot (for 4 people, estimate per person)
   americano: 150, // Americano
-  'americano decaf': 50, // Americano decaffeinato
+  'americano decaf': 50, // Americano decaffeinato (legacy)
+  'decaf americano': 50, // Decaf Americano
 
   decaf: 15      // Decaffeinated coffee
 };
@@ -481,7 +485,7 @@ function renderCharts() {
     type:'doughnut',
     data:{labels:Object.keys(tCounts),
           datasets:[{data:Object.values(tCounts),
-                      backgroundColor:['#4e342e','#6f4e37','#8d6e63','#d7ccc8'],
+                      backgroundColor:['#4e342e','#6f4e37','#8d6e63','#d7ccc8','#a1887f','#bcaaa4'],
                       hoverOffset:6}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom',
